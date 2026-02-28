@@ -1,0 +1,151 @@
+#pragma once
+
+#include <stdint.h>
+
+#include "SGF/Actions.h"
+#include "SGF/Game.h"
+#include "SGF/HardwareProfile.h"
+#include "SGF/InputPin.h"
+#include "SGF/IRenderTarget.h"
+#include "SGF/IScreen.h"
+#include "Hud.h"
+
+class Wolf3DGame : public Game {
+public:
+  Wolf3DGame(
+    IRenderTarget& renderTarget,
+    IScreen& screen,
+    const SGFHardware::HardwareProfile& hardwareProfile
+  );
+
+  void setup();
+
+private:
+  static constexpr uint32_t FRAME_DEFAULT_STEP_US = 16666u;
+  static constexpr uint32_t FRAME_MAX_STEP_US = 33333u;
+  static constexpr int MAX_SCREEN_W = 240;
+  static constexpr int MAX_SCREEN_H = 240;
+  static constexpr int HUD_H = 40;
+  static constexpr int WORLD_H = MAX_SCREEN_H - HUD_H;
+  static constexpr int UPSCALE = 2;
+  static constexpr int RENDER_W = MAX_SCREEN_W / UPSCALE;
+  static constexpr int RENDER_H = WORLD_H / UPSCALE;
+  static constexpr int TEX_SIZE = 16;
+  static constexpr int MAP_W = 16;
+  static constexpr int MAP_H = 16;
+  static constexpr float MOVE_SPEED = 2.2f;
+  static constexpr float STRAFE_SPEED = 1.8f;
+  static constexpr float TURN_SPEED = 1.8f;
+  static constexpr float CAMERA_PLANE_SCALE = 0.66f;
+  static constexpr int MINIMAP_CELL = 5;
+  static constexpr int MINIMAP_MARGIN = 6;
+  static constexpr int START_AMMO = 99;
+  static constexpr int START_LIVES = 3;
+  static constexpr int START_ENERGY = 100;
+  static constexpr int DAMAGE_ON_BUMP = 6;
+  static constexpr float DOOR_REACH = 0.85f;
+  static constexpr uint32_t BUMP_DAMAGE_COOLDOWN_MS = 260;
+  static constexpr uint32_t FACE_BLINK_MS = 120;
+  static constexpr uint32_t FACE_SHOOT_MS = 150;
+  static constexpr uint32_t FACE_HURT_MS = 260;
+  static constexpr int HUD_LIVES_X = 4;
+  static constexpr int HUD_LIVES_Y = 4;
+  static constexpr int HUD_LIVES_W = 58;
+  static constexpr int HUD_LIVES_H = 32;
+  static constexpr int HUD_FACE_X = 74;
+  static constexpr int HUD_FACE_Y = 4;
+  static constexpr int HUD_FACE_W = 92;
+  static constexpr int HUD_FACE_H = 32;
+  static constexpr int HUD_STATS_X = 176;
+  static constexpr int HUD_AMMO_Y = 4;
+  static constexpr int HUD_AMMO_H = 14;
+  static constexpr int HUD_ENERGY_Y = 21;
+  static constexpr int HUD_ENERGY_H = 14;
+  static constexpr int HUD_STATS_W = 60;
+
+  IRenderTarget& renderTarget;
+  IScreen& screen;
+  SGFHardware::HardwareProfile hardwareProfile;
+  int screenW = 0;
+  int screenH = 0;
+  int worldScreenH = WORLD_H;
+
+  uint8_t pinLeft = 0;
+  uint8_t pinRight = 0;
+  uint8_t pinUp = 0;
+  uint8_t pinDown = 0;
+  uint8_t pinFire = 0;
+
+  DebouncedInputPin leftPinInput;
+  DebouncedInputPin rightPinInput;
+  DebouncedInputPin upPinInput;
+  DebouncedInputPin downPinInput;
+  DebouncedInputPin firePinInput;
+  DigitalAction leftAction;
+  DigitalAction rightAction;
+  DigitalAction upAction;
+  DigitalAction downAction;
+  DigitalAction fireAction;
+
+  uint16_t frameBuffer[RENDER_W * RENDER_H]{};
+  uint16_t upscaleBuffer[MAX_SCREEN_W * UPSCALE]{};
+
+  float playerX = 3.5f;
+  float playerY = 3.5f;
+  float dirX = 1.0f;
+  float dirY = 0.0f;
+  float planeX = 0.0f;
+  float planeY = CAMERA_PLANE_SCALE;
+  uint32_t frameCounter = 0;
+  int ammo = START_AMMO;
+  int lives = START_LIVES;
+  int energy = START_ENERGY;
+  bool showMinimap = false;
+  bool minimapShortcutHeld = false;
+  uint32_t nextBlinkMs = 0;
+  uint32_t blinkUntilMs = 0;
+  uint32_t shotUntilMs = 0;
+  uint32_t hurtUntilMs = 0;
+  uint32_t nextDamageMs = 0;
+  Hud hud;
+  uint8_t map[MAP_H][MAP_W]{};
+  bool doorOpen[MAP_H][MAP_W]{};
+
+  static const uint8_t INITIAL_MAP[MAP_H][MAP_W];
+
+  void onSetup() override;
+  void onPhysics(float delta) override;
+  void onProcess(float delta) override;
+
+  void resetMap();
+  void resetPlayerPose();
+  bool wallAt(int cellX, int cellY) const;
+  bool attemptMove(float nextX, float nextY);
+  void onBlockedMove();
+  void rotate(float angle);
+  bool toggleDoorAhead();
+  bool canCloseDoor(int cellX, int cellY) const;
+  void shoot();
+  void applyDamage(int amount);
+  void updateInput(float delta);
+  void updateHudAnimation();
+  Hud::FaceMood currentFaceMood(uint32_t nowMs) const;
+
+  void renderFrame();
+  void presentFrame();
+  void clearFrame();
+  void renderFloor();
+  void renderWorld();
+  void renderColumn(
+    int x,
+    int drawStart,
+    int drawEnd,
+    uint8_t tile,
+    int texX,
+    float distance,
+    bool side);
+  void putPixel(int x, int y, uint16_t color565);
+  uint16_t shadeColor(uint16_t color565, float distance, bool side) const;
+  uint16_t wallColor(uint8_t tile) const;
+  uint16_t wallTexel(uint8_t tile, int texX, int texY) const;
+};
