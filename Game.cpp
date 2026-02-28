@@ -7,6 +7,7 @@
 
 #include "Door.h"
 #include "FloorRenderer.h"
+#include "Keys.h"
 #include "Map.h"
 #include "Minimap.h"
 #include "SGF/Color565.h"
@@ -160,6 +161,7 @@ void Wolf3DGame::onSetup() {
   ammo = START_AMMO;
   lives = START_LIVES;
   energy = START_ENERGY;
+  keysOwned = 0;
   resetMap();
   resetPlayerPose();
   nextBlinkMs = millis() + 1300;
@@ -176,7 +178,9 @@ void Wolf3DGame::onSetup() {
   hud.setLives(lives);
   hud.setAmmo(ammo);
   hud.setEnergy(energy);
+  hud.setKeys(keysOwned);
   hud.setFaceMood(currentFaceMood(millis()));
+  collectPickupUnderPlayer();
   hud.invalidate();
 
   renderFrame();
@@ -247,12 +251,22 @@ Zombie::WorldView Wolf3DGame::makeZombieWorldView(uint32_t nowMs, float delta) c
   return world;
 }
 
+bool Wolf3DGame::hasKey(KeyColor color) const {
+  if (color == KeyColor::None) {
+    return true;
+  }
+  return (keysOwned & Keys::bitFor(color)) != 0;
+}
+
 bool Wolf3DGame::wallAt(int cellX, int cellY) const {
   if (cellX < 0 || cellX >= mapWidth || cellY < 0 || cellY >= mapHeight) {
     return true;
   }
   uint8_t tile = map[cellY][cellX];
   if (tile == 0) {
+    return false;
+  }
+  if (Keys::isPickup(tile)) {
     return false;
   }
   if (Door::isTile(tile)) {
@@ -310,6 +324,15 @@ bool Wolf3DGame::toggleDoorAhead() {
       doorOpen[cellY][cellX] = false;
     }
   } else {
+    KeyColor required = Door::requiredKey(map[cellY][cellX]);
+    if (!hasKey(required)) {
+      return true;
+    }
+    if (required != KeyColor::None) {
+      keysOwned &= static_cast<uint8_t>(~Keys::bitFor(required));
+      hud.setKeys(keysOwned);
+      map[cellY][cellX] = 'D';
+    }
     doorOpen[cellY][cellX] = true;
   }
   return true;
@@ -319,6 +342,23 @@ bool Wolf3DGame::canCloseDoor(int cellX, int cellY) const {
   int playerCellX = static_cast<int>(playerX);
   int playerCellY = static_cast<int>(playerY);
   return playerCellX != cellX || playerCellY != cellY;
+}
+
+void Wolf3DGame::collectPickupUnderPlayer() {
+  int cellX = static_cast<int>(playerX);
+  int cellY = static_cast<int>(playerY);
+  if (cellX < 0 || cellX >= mapWidth || cellY < 0 || cellY >= mapHeight) {
+    return;
+  }
+
+  uint8_t tile = map[cellY][cellX];
+  if (!Keys::isPickup(tile)) {
+    return;
+  }
+
+  keysOwned |= Keys::bitFor(Keys::colorForPickup(tile));
+  map[cellY][cellX] = 0;
+  hud.setKeys(keysOwned);
 }
 
 void Wolf3DGame::shoot() {
@@ -426,6 +466,8 @@ void Wolf3DGame::updateInput(float delta) {
       rotate(turnStep);
     }
   }
+
+  collectPickupUnderPlayer();
 }
 
 void Wolf3DGame::updateZombies(float delta) {
@@ -484,6 +526,7 @@ void Wolf3DGame::renderFrame() {
   clearFrame();
   renderFloor();
   renderWorld();
+  renderKeys();
   renderZombies(millis());
   renderWeapon(millis());
   if (showMinimap) {
@@ -705,6 +748,63 @@ void Wolf3DGame::renderFpsCounter() {
   Font5x7::drawText(boxX + paddingX, boxY + paddingY, fpsText, textScale, text, &ctx, fillRectOnFrame);
 }
 
+void Wolf3DGame::renderKeys() {
+  float invDet = 1.0f / (planeX * dirY - dirX * planeY);
+  for (int mapY = 0; mapY < mapHeight; mapY++) {
+    for (int mapX = 0; mapX < mapWidth; mapX++) {
+      uint8_t tile = map[mapY][mapX];
+      if (!Keys::isPickup(tile)) {
+        continue;
+      }
+
+      float spriteX = (static_cast<float>(mapX) + 0.5f) - playerX;
+      float spriteY = (static_cast<float>(mapY) + 0.5f) - playerY;
+      float transformX = invDet * (dirY * spriteX - dirX * spriteY);
+      float transformY = invDet * (-planeY * spriteX + planeX * spriteY);
+      if (transformY <= 0.15f) {
+        continue;
+      }
+
+      int spriteScreenX =
+        static_cast<int>((static_cast<float>(RENDER_W) * 0.5f) * (1.0f + transformX / transformY));
+      int spriteHeight = abs(static_cast<int>(static_cast<float>(RENDER_H) / transformY));
+      int spriteWidth = spriteHeight / 2;
+      if (spriteWidth < 4) {
+        spriteWidth = 4;
+      }
+
+      int drawStartY = (-spriteHeight / 2) + (RENDER_H / 2);
+      int drawEndY = (spriteHeight / 2) + (RENDER_H / 2);
+      drawStartY = Math::clamp(drawStartY, 0, RENDER_H - 1);
+      drawEndY = Math::clamp(drawEndY, 0, RENDER_H - 1);
+
+      int drawStartX = spriteScreenX - spriteWidth / 2;
+      int drawEndX = spriteScreenX + spriteWidth / 2;
+      drawStartX = Math::clamp(drawStartX, 0, RENDER_W - 1);
+      drawEndX = Math::clamp(drawEndX, 0, RENDER_W - 1);
+
+      for (int stripe = drawStartX; stripe <= drawEndX; stripe++) {
+        if (transformY >= wallDepth[stripe]) {
+          continue;
+        }
+
+        int texX = ((stripe - drawStartX) * 16) / Math::clamp(spriteWidth, 1, RENDER_W);
+        texX = Math::clamp(texX, 0, 15);
+
+        for (int y = drawStartY; y <= drawEndY; y++) {
+          int texY = ((y - drawStartY) * 16) / Math::clamp(spriteHeight, 1, RENDER_H);
+          texY = Math::clamp(texY, 0, 15);
+          uint16_t color565 = Keys::texel(tile, texX, texY);
+          if (color565 == 0) {
+            continue;
+          }
+          frameBuffer[y * RENDER_W + stripe] = shadeColor(color565, transformY, false);
+        }
+      }
+    }
+  }
+}
+
 void Wolf3DGame::renderZombies(uint32_t nowMs) {
   int order[Zombie::MAX_COUNT]{};
   float distances[Zombie::MAX_COUNT]{};
@@ -894,7 +994,7 @@ uint16_t Wolf3DGame::wallColor(uint8_t tile) const {
 
 uint16_t Wolf3DGame::wallTexel(uint8_t tile, int texX, int texY) const {
   if (Door::isTile(tile)) {
-    return Door::texel(texX, texY);
+    return Door::texel(tile, texX, texY);
   }
 
   uint16_t base = wallColor(tile);

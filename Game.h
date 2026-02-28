@@ -9,6 +9,7 @@
 #include "SGF/IRenderTarget.h"
 #include "SGF/IScreen.h"
 #include "Hud.h"
+#include "Keys.h"
 #include "Map.h"
 #include "Zombie.h"
 
@@ -108,6 +109,7 @@ private:
   int ammo = START_AMMO;
   int lives = START_LIVES;
   int energy = START_ENERGY;
+  uint8_t keysOwned = 0;
   bool showMinimap = false;
   bool minimapShortcutHeld = false;
   uint32_t damageFlashUntilMs = 0;
@@ -132,12 +134,14 @@ private:
   void resetMap();
   void resetPlayerPose();
   Zombie::WorldView makeZombieWorldView(uint32_t nowMs, float delta) const;
+  bool hasKey(KeyColor color) const;
   bool wallAt(int cellX, int cellY) const;
   bool attemptMove(float nextX, float nextY);
   void onBlockedMove();
   void rotate(float angle);
   bool toggleDoorAhead();
   bool canCloseDoor(int cellX, int cellY) const;
+  void collectPickupUnderPlayer();
   void shoot();
   void applyDamage(int amount);
   void updateInput(float delta);
@@ -151,6 +155,7 @@ private:
   void clearFrame();
   void renderFloor();
   void renderFpsCounter();
+  void renderKeys();
   void renderWorld();
   void renderZombies(uint32_t nowMs);
   void renderWeapon(uint32_t nowMs);

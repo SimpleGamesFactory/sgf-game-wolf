@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "Keys.h"
 #include "SGF/Color565.h"
 #include "SGF/Font5x7.h"
 
@@ -62,6 +63,14 @@ void Hud::setEnergy(int value) {
   }
   energy = value;
   markDirtyRect(HUD_STATS_X, HUD_ENERGY_Y, HUD_STATS_W, HUD_ENERGY_H);
+}
+
+void Hud::setKeys(uint8_t value) {
+  if (keysMask == value) {
+    return;
+  }
+  keysMask = value;
+  markDirtyRect(HUD_FACE_X + HUD_FACE_W - 34, HUD_FACE_Y + 4, 28, 10);
 }
 
 void Hud::setFaceMood(FaceMood value) {
@@ -246,6 +255,32 @@ void Hud::render() {
   }
 
   drawFace(HUD_FACE_X + 6, HUD_FACE_Y + 2, HUD_FACE_W - 12, HUD_FACE_H - 4);
+
+  const int keySlotY = HUD_FACE_Y + 5;
+  const int keySlotW = 8;
+  const int keySlotH = 8;
+  const int keySlotGap = 2;
+  const int keyStartX = HUD_FACE_X + HUD_FACE_W - 32;
+  const uint16_t keySlotBg = Color565::rgb(22, 16, 12);
+  const uint16_t keySlotFrame = Color565::rgb(120, 92, 48);
+  const KeyColor keyOrder[3] = {KeyColor::Red, KeyColor::Green, KeyColor::Blue};
+  for (int i = 0; i < 3; i++) {
+    int slotX = keyStartX + i * (keySlotW + keySlotGap);
+    KeyColor keyColor = keyOrder[i];
+    uint16_t color565 = Keys::color565(keyColor);
+    bool owned = (keysMask & Keys::bitFor(keyColor)) != 0;
+    fillRect(slotX, keySlotY, keySlotW, keySlotH, keySlotBg);
+    fillRect(slotX, keySlotY, keySlotW, 1, keySlotFrame);
+    fillRect(slotX, keySlotY + keySlotH - 1, keySlotW, 1, keySlotFrame);
+    fillRect(slotX, keySlotY, 1, keySlotH, keySlotFrame);
+    fillRect(slotX + keySlotW - 1, keySlotY, 1, keySlotH, keySlotFrame);
+    if (owned) {
+      fillRect(slotX + 2, keySlotY + 2, 4, 4, color565);
+      fillRect(slotX + 2, keySlotY + 1, 2, 1, Color565::lighten(color565));
+    } else {
+      fillRect(slotX + 2, keySlotY + 2, 4, 4, Color565::darken(color565));
+    }
+  }
 }
 
 void Hud::flush(IRenderTarget& target) {

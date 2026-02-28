@@ -36,6 +36,7 @@ public:
   void setLives(int value);
   void setAmmo(int value);
   void setEnergy(int value);
+  void setKeys(uint8_t value);
   void setFaceMood(FaceMood value);
   void invalidate();
   void render();
@@ -49,6 +50,7 @@ private:
   int lives = 3;
   int ammo = 99;
   int energy = 100;
+  uint8_t keysMask = 0;
   FaceMood faceMood = FaceMood::Normal;
 
   void markDirtyRect(int x, int y, int w, int h);

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "Door.h"
+#include "Keys.h"
 #include "SGF/Color565.h"
 
 namespace {
@@ -45,7 +46,7 @@ void drawRect(
 
 uint16_t tileColor(uint8_t tile, bool isOpen) {
   if (Door::isTile(tile)) {
-    return Door::minimapColor(isOpen);
+    return Door::minimapColor(tile, isOpen);
   }
   switch (tile) {
     case 1: return Color565::rgb(140, 66, 58);
@@ -93,7 +94,9 @@ void Minimap::render(
     for (int x = 0; x < mapW; x++) {
       uint8_t tile = map[y * mapStride + x];
       bool isOpen = doorOpen && doorOpen[y * mapStride + x];
-      uint16_t color565 = tile ? tileColor(tile, isOpen) : Color565::rgb(18, 22, 26);
+      bool isKey = Keys::isPickup(tile);
+      uint16_t color565 =
+        (tile && !isKey) ? tileColor(tile, isOpen) : Color565::rgb(18, 22, 26);
       drawRect(
         buffer,
         width,
@@ -103,6 +106,17 @@ void Minimap::render(
         CELL - 1,
         CELL - 1,
         color565);
+      if (isKey) {
+        drawRect(
+          buffer,
+          width,
+          height,
+          MARGIN + x * CELL + 1,
+          MARGIN + y * CELL + 1,
+          CELL - 3,
+          CELL - 3,
+          Keys::minimapColor(tile));
+      }
     }
   }
 
