@@ -2,13 +2,75 @@
 
 #include <Arduino.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "Door.h"
+#include "FloorRenderer.h"
 #include "Map.h"
 #include "Minimap.h"
 #include "SGF/Color565.h"
+#include "SGF/Font5x7.h"
 #include "SGF/Math.h"
+
+namespace {
+
+struct FrameDrawContext {
+  uint16_t* buffer = nullptr;
+  int width = 0;
+  int height = 0;
+};
+
+uint16_t applyDamageFlash(uint16_t color565, uint8_t strength) {
+  if (strength == 0) {
+    return color565;
+  }
+
+  uint8_t r5 = (color565 >> 11) & 0x1F;
+  uint8_t g6 = (color565 >> 5) & 0x3F;
+  uint8_t b5 = color565 & 0x1F;
+
+  r5 = static_cast<uint8_t>(r5 + (((31u - r5) * strength) >> 8));
+  g6 = static_cast<uint8_t>((g6 * (255u - (strength >> 1))) >> 8);
+  b5 = static_cast<uint8_t>((b5 * (255u - ((strength * 3u) >> 2))) >> 8);
+
+  return static_cast<uint16_t>((r5 << 11) | (g6 << 5) | b5);
+}
+
+uint8_t damageFlashStrength(uint32_t nowMs, uint32_t damageFlashUntilMs, uint32_t durationMs) {
+  if (damageFlashUntilMs == 0 || nowMs >= damageFlashUntilMs || durationMs == 0) {
+    return 0;
+  }
+
+  uint32_t remainingMs = damageFlashUntilMs - nowMs;
+  uint32_t strength = (remainingMs * 224u) / durationMs;
+  if (strength > 224u) {
+    strength = 224u;
+  }
+  return static_cast<uint8_t>(strength);
+}
+
+void fillRectOnFrame(void* ctx, int x, int y, int w, int h, uint16_t color565) {
+  FrameDrawContext* draw = static_cast<FrameDrawContext*>(ctx);
+  if (draw == 0 || draw->buffer == 0 || w <= 0 || h <= 0) {
+    return;
+  }
+
+  for (int yy = y; yy < y + h; yy++) {
+    if (yy < 0 || yy >= draw->height) {
+      continue;
+    }
+    uint16_t* row = &draw->buffer[yy * draw->width];
+    for (int xx = x; xx < x + w; xx++) {
+      if (xx < 0 || xx >= draw->width) {
+        continue;
+      }
+      row[xx] = color565;
+    }
+  }
+}
+
+}  // namespace
 
 Wolf3DGame::Wolf3DGame(
   IRenderTarget& renderTargetRef,
@@ -70,7 +132,11 @@ void Wolf3DGame::onSetup() {
   blinkUntilMs = 0;
   shotUntilMs = 0;
   hurtUntilMs = 0;
+  damageFlashUntilMs = 0;
   nextDamageMs = 0;
+  displayedFps = 0;
+  fpsSampleFrames = 0;
+  fpsSampleStartMs = millis();
 
   hud.begin(screenW, worldScreenH);
   hud.setLives(lives);
@@ -100,6 +166,7 @@ void Wolf3DGame::onPhysics(float delta) {
 
 void Wolf3DGame::onProcess(float delta) {
   (void)delta;
+  updateFpsCounter(millis());
   renderFrame();
   presentFrame();
   hud.render();
@@ -252,11 +319,13 @@ void Wolf3DGame::applyDamage(int amount) {
     return;
   }
 
+  uint32_t nowMs = millis();
   energy -= amount;
-  hurtUntilMs = millis() + FACE_HURT_MS;
+  hurtUntilMs = nowMs + FACE_HURT_MS;
+  damageFlashUntilMs = nowMs + DAMAGE_FLASH_MS;
   if (energy > 0) {
     hud.setEnergy(energy);
-    hud.setFaceMood(currentFaceMood(millis()));
+    hud.setFaceMood(currentFaceMood(nowMs));
     return;
   }
 
@@ -271,7 +340,7 @@ void Wolf3DGame::applyDamage(int amount) {
   hud.setLives(lives);
   hud.setAmmo(ammo);
   hud.setEnergy(energy);
-  hud.setFaceMood(currentFaceMood(millis()));
+  hud.setFaceMood(currentFaceMood(nowMs));
 }
 
 void Wolf3DGame::updateInput(float delta) {
@@ -280,6 +349,20 @@ void Wolf3DGame::updateInput(float delta) {
     showMinimap = !showMinimap;
   }
   minimapShortcutHeld = minimapShortcut;
+
+  bool floorTextureShortcut =
+    leftAction.pressed() &&
+    rightAction.pressed() &&
+    upAction.pressed() &&
+    downAction.pressed() &&
+    !fireAction.pressed();
+  if (floorTextureShortcut && !floorTextureShortcutHeld) {
+    floorTextureEnabled = !floorTextureEnabled;
+  }
+  floorTextureShortcutHeld = floorTextureShortcut;
+  if (floorTextureShortcut) {
+    return;
+  }
 
   if (fireAction.justPressed() &&
       !upAction.pressed() &&
@@ -365,6 +448,22 @@ void Wolf3DGame::updateHudAnimation() {
   hud.setFaceMood(currentFaceMood(nowMs));
 }
 
+void Wolf3DGame::updateFpsCounter(uint32_t nowMs) {
+  if (fpsSampleStartMs == 0) {
+    fpsSampleStartMs = nowMs;
+  }
+
+  fpsSampleFrames++;
+  uint32_t elapsedMs = nowMs - fpsSampleStartMs;
+  if (elapsedMs < 250u) {
+    return;
+  }
+
+  displayedFps = static_cast<uint16_t>((fpsSampleFrames * 1000u + (elapsedMs / 2u)) / elapsedMs);
+  fpsSampleFrames = 0;
+  fpsSampleStartMs = nowMs;
+}
+
 void Wolf3DGame::renderFrame() {
   clearFrame();
   renderFloor();
@@ -386,18 +485,31 @@ void Wolf3DGame::renderFrame() {
       dirX,
       dirY);
   }
+  renderFpsCounter();
 }
 
 void Wolf3DGame::presentFrame() {
+  uint8_t flashStrength = damageFlashStrength(millis(), damageFlashUntilMs, DAMAGE_FLASH_MS);
   for (int y = 0; y < RENDER_H; y++) {
     const uint16_t* src = &frameBuffer[y * RENDER_W];
-    for (int x = 0; x < RENDER_W; x++) {
-      uint16_t color565 = src[x];
-      int dstX = x * UPSCALE;
-      upscaleBuffer[dstX] = color565;
-      upscaleBuffer[dstX + 1] = color565;
-      upscaleBuffer[screenW + dstX] = color565;
-      upscaleBuffer[screenW + dstX + 1] = color565;
+    if (flashStrength == 0) {
+      for (int x = 0; x < RENDER_W; x++) {
+        uint16_t color565 = src[x];
+        int dstX = x * UPSCALE;
+        upscaleBuffer[dstX] = color565;
+        upscaleBuffer[dstX + 1] = color565;
+        upscaleBuffer[screenW + dstX] = color565;
+        upscaleBuffer[screenW + dstX + 1] = color565;
+      }
+    } else {
+      for (int x = 0; x < RENDER_W; x++) {
+        uint16_t color565 = applyDamageFlash(src[x], flashStrength);
+        int dstX = x * UPSCALE;
+        upscaleBuffer[dstX] = color565;
+        upscaleBuffer[dstX + 1] = color565;
+        upscaleBuffer[screenW + dstX] = color565;
+        upscaleBuffer[screenW + dstX + 1] = color565;
+      }
     }
     renderTarget.blit565(0, y * UPSCALE, screenW, UPSCALE, upscaleBuffer);
   }
@@ -435,6 +547,20 @@ void Wolf3DGame::clearFrame() {
 }
 
 void Wolf3DGame::renderFloor() {
+  if (floorTextureEnabled) {
+    FloorRenderer::render(
+      frameBuffer,
+      RENDER_W,
+      RENDER_H,
+      playerX,
+      playerY,
+      dirX,
+      dirY,
+      planeX,
+      planeY);
+    return;
+  }
+
   const int halfH = RENDER_H / 2;
   const uint16_t floorColor = Color565::rgb(60, 52, 46);
   for (int y = halfH + 1; y < RENDER_H; y++) {
@@ -539,6 +665,32 @@ void Wolf3DGame::renderWorld() {
     wallDepth[x] = perpWallDist;
     renderColumn(x, drawStart, drawEnd, tile, texX, perpWallDist, side);
   }
+}
+
+void Wolf3DGame::renderFpsCounter() {
+  char fpsText[12];
+  snprintf(fpsText, sizeof(fpsText), "%u FPS", static_cast<unsigned>(displayedFps));
+
+  FrameDrawContext ctx{frameBuffer, RENDER_W, RENDER_H};
+  const int textScale = 1;
+  const int textW = Font5x7::textWidth(fpsText, textScale);
+  const int textH = 7 * textScale;
+  const int paddingX = 3;
+  const int paddingY = 2;
+  const int boxW = textW + paddingX * 2;
+  const int boxH = textH + paddingY * 2;
+  const int boxX = RENDER_W - boxW - 2;
+  const int boxY = 2;
+  const uint16_t bg = Color565::rgb(8, 10, 14);
+  const uint16_t border = Color565::rgb(60, 76, 92);
+  const uint16_t text = Color565::rgb(236, 220, 180);
+
+  fillRect(boxX, boxY, boxW, boxH, bg);
+  fillRect(boxX, boxY, boxW, 1, border);
+  fillRect(boxX, boxY + boxH - 1, boxW, 1, border);
+  fillRect(boxX, boxY, 1, boxH, border);
+  fillRect(boxX + boxW - 1, boxY, 1, boxH, border);
+  Font5x7::drawText(boxX + paddingX, boxY + paddingY, fpsText, textScale, text, &ctx, fillRectOnFrame);
 }
 
 void Wolf3DGame::renderZombies(uint32_t nowMs) {

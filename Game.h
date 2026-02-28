@@ -47,6 +47,7 @@ private:
   static constexpr int DAMAGE_ON_BUMP = 6;
   static constexpr float DOOR_REACH = 0.85f;
   static constexpr uint32_t WEAPON_FLASH_MS = 90;
+  static constexpr uint32_t DAMAGE_FLASH_MS = 120;
   static constexpr uint32_t BUMP_DAMAGE_COOLDOWN_MS = 260;
   static constexpr uint32_t FACE_BLINK_MS = 120;
   static constexpr uint32_t FACE_SHOOT_MS = 150;
@@ -101,11 +102,17 @@ private:
   float planeX = 0.0f;
   float planeY = CAMERA_PLANE_SCALE;
   uint32_t frameCounter = 0;
+  uint16_t displayedFps = 0;
+  uint16_t fpsSampleFrames = 0;
+  uint32_t fpsSampleStartMs = 0;
   int ammo = START_AMMO;
   int lives = START_LIVES;
   int energy = START_ENERGY;
   bool showMinimap = false;
   bool minimapShortcutHeld = false;
+  bool floorTextureEnabled = true;
+  bool floorTextureShortcutHeld = false;
+  uint32_t damageFlashUntilMs = 0;
   uint32_t nextBlinkMs = 0;
   uint32_t blinkUntilMs = 0;
   uint32_t shotUntilMs = 0;
@@ -138,12 +145,14 @@ private:
   void updateInput(float delta);
   void updateZombies(float delta);
   void updateHudAnimation();
+  void updateFpsCounter(uint32_t nowMs);
   Hud::FaceMood currentFaceMood(uint32_t nowMs) const;
 
   void renderFrame();
   void presentFrame();
   void clearFrame();
   void renderFloor();
+  void renderFpsCounter();
   void renderWorld();
   void renderZombies(uint32_t nowMs);
   void renderWeapon(uint32_t nowMs);
