@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "Door.h"
 #include "Map.h"
@@ -93,6 +94,7 @@ void Wolf3DGame::onPhysics(float delta) {
   fireAction.update(firePinInput.update());
 
   updateInput(delta);
+  updateZombies(delta);
   updateHudAnimation();
 }
 
@@ -107,6 +109,7 @@ void Wolf3DGame::onProcess(float delta) {
 
 void Wolf3DGame::resetMap() {
   Map::load(map, doorOpen, mapWidth, mapHeight, spawn);
+  Zombie::loadSpawns(zombies, zombieCount, MapLayout::E1M1);
 }
 
 void Wolf3DGame::resetPlayerPose() {
@@ -127,6 +130,20 @@ void Wolf3DGame::resetPlayerPose() {
     planeX = -CAMERA_PLANE_SCALE;
     planeY = 0.0f;
   }
+}
+
+Zombie::WorldView Wolf3DGame::makeZombieWorldView(uint32_t nowMs, float delta) const {
+  Zombie::WorldView world;
+  world.map = &map[0][0];
+  world.doorOpen = &doorOpen[0][0];
+  world.mapStride = MAP_MAX_W;
+  world.mapWidth = mapWidth;
+  world.mapHeight = mapHeight;
+  world.playerX = playerX;
+  world.playerY = playerY;
+  world.nowMs = nowMs;
+  world.delta = delta;
+  return world;
 }
 
 bool Wolf3DGame::wallAt(int cellX, int cellY) const {
@@ -207,10 +224,27 @@ void Wolf3DGame::shoot() {
   if (ammo <= 0) {
     return;
   }
+
+  uint32_t nowMs = millis();
   ammo--;
-  shotUntilMs = millis() + FACE_SHOOT_MS;
+  shotUntilMs = nowMs + FACE_SHOOT_MS;
   hud.setAmmo(ammo);
-  hud.setFaceMood(currentFaceMood(millis()));
+  hud.setFaceMood(currentFaceMood(nowMs));
+
+  Zombie::WorldView world = makeZombieWorldView(nowMs, 0.0f);
+  Zombie::AimView aim{world, dirX, dirY};
+  int targetIndex = -1;
+  float bestDistance = 1e30f;
+  for (int i = 0; i < zombieCount; i++) {
+    float hitDistance = 0.0f;
+    if (zombies[i].tryHit(aim, hitDistance) && hitDistance < bestDistance) {
+      bestDistance = hitDistance;
+      targetIndex = i;
+    }
+  }
+  if (targetIndex >= 0) {
+    zombies[targetIndex].kill();
+  }
 }
 
 void Wolf3DGame::applyDamage(int amount) {
@@ -295,6 +329,17 @@ void Wolf3DGame::updateInput(float delta) {
   }
 }
 
+void Wolf3DGame::updateZombies(float delta) {
+  Zombie::WorldView world = makeZombieWorldView(millis(), delta);
+  int damage = 0;
+  for (int i = 0; i < zombieCount; i++) {
+    zombies[i].update(world, damage);
+  }
+  if (damage > 0) {
+    applyDamage(damage);
+  }
+}
+
 Hud::FaceMood Wolf3DGame::currentFaceMood(uint32_t nowMs) const {
   if (nowMs < hurtUntilMs) {
     return Hud::FaceMood::Hurt;
@@ -324,6 +369,8 @@ void Wolf3DGame::renderFrame() {
   clearFrame();
   renderFloor();
   renderWorld();
+  renderZombies(millis());
+  renderWeapon(millis());
   if (showMinimap) {
     Minimap::render(
       frameBuffer,
@@ -489,8 +536,123 @@ void Wolf3DGame::renderWorld() {
       texX = TEX_SIZE - texX - 1;
     }
 
+    wallDepth[x] = perpWallDist;
     renderColumn(x, drawStart, drawEnd, tile, texX, perpWallDist, side);
   }
+}
+
+void Wolf3DGame::renderZombies(uint32_t nowMs) {
+  int order[Zombie::MAX_COUNT]{};
+  float distances[Zombie::MAX_COUNT]{};
+  int renderCount = 0;
+  for (int i = 0; i < zombieCount; i++) {
+    if (!zombies[i].isAlive()) {
+      continue;
+    }
+    float dx = zombies[i].getX() - playerX;
+    float dy = zombies[i].getY() - playerY;
+    order[renderCount] = i;
+    distances[renderCount] = dx * dx + dy * dy;
+    renderCount++;
+  }
+
+  for (int i = 0; i < renderCount - 1; i++) {
+    for (int j = i + 1; j < renderCount; j++) {
+      if (distances[j] > distances[i]) {
+        float tmpDistance = distances[i];
+        distances[i] = distances[j];
+        distances[j] = tmpDistance;
+
+        int tmpOrder = order[i];
+        order[i] = order[j];
+        order[j] = tmpOrder;
+      }
+    }
+  }
+
+  float invDet = 1.0f / (planeX * dirY - dirX * planeY);
+  for (int i = 0; i < renderCount; i++) {
+    const Zombie& zombie = zombies[order[i]];
+    float spriteX = zombie.getX() - playerX;
+    float spriteY = zombie.getY() - playerY;
+    float transformX = invDet * (dirY * spriteX - dirX * spriteY);
+    float transformY = invDet * (-planeY * spriteX + planeX * spriteY);
+    if (transformY <= 0.15f) {
+      continue;
+    }
+
+    int spriteScreenX =
+      static_cast<int>((static_cast<float>(RENDER_W) * 0.5f) * (1.0f + transformX / transformY));
+    int spriteHeight = abs(static_cast<int>(static_cast<float>(RENDER_H) / transformY));
+    int spriteWidth = (spriteHeight * 3) / 4;
+    if (spriteWidth < 4) {
+      spriteWidth = 4;
+    }
+
+    int drawStartY = (-spriteHeight / 2) + (RENDER_H / 2);
+    int drawEndY = (spriteHeight / 2) + (RENDER_H / 2);
+    drawStartY = Math::clamp(drawStartY, 0, RENDER_H - 1);
+    drawEndY = Math::clamp(drawEndY, 0, RENDER_H - 1);
+
+    int drawStartX = spriteScreenX - spriteWidth / 2;
+    int drawEndX = spriteScreenX + spriteWidth / 2;
+    drawStartX = Math::clamp(drawStartX, 0, RENDER_W - 1);
+    drawEndX = Math::clamp(drawEndX, 0, RENDER_W - 1);
+
+    for (int stripe = drawStartX; stripe <= drawEndX; stripe++) {
+      if (transformY >= wallDepth[stripe]) {
+        continue;
+      }
+
+      int texX =
+        ((stripe - drawStartX) * Zombie::TEX_SIZE) / Math::clamp(spriteWidth, 1, RENDER_W);
+      texX = Math::clamp(texX, 0, Zombie::TEX_SIZE - 1);
+
+      for (int y = drawStartY; y <= drawEndY; y++) {
+        int texY =
+          ((y - drawStartY) * Zombie::TEX_SIZE) / Math::clamp(spriteHeight, 1, RENDER_H);
+        texY = Math::clamp(texY, 0, Zombie::TEX_SIZE - 1);
+        uint16_t color565 = zombie.texel(texX, texY, nowMs);
+        if (color565 == 0) {
+          continue;
+        }
+        frameBuffer[y * RENDER_W + stripe] = shadeColor(color565, transformY, false);
+      }
+    }
+  }
+}
+
+void Wolf3DGame::renderWeapon(uint32_t nowMs) {
+  const uint16_t metal = Color565::rgb(124, 130, 142);
+  const uint16_t darkMetal = Color565::rgb(76, 82, 92);
+  const uint16_t grip = Color565::rgb(78, 54, 38);
+  const uint16_t muzzle = Color565::rgb(240, 188, 84);
+  const uint16_t muzzleHot = Color565::rgb(255, 246, 210);
+  const int gunW = 28;
+  const int gunH = 18;
+  int baseX = (RENDER_W - gunW) / 2;
+  int baseY = RENDER_H - gunH - 2;
+
+  fillRect(baseX + 10, baseY + 2, 12, 5, metal);
+  fillRect(baseX + 12, baseY + 1, 8, 2, darkMetal);
+  fillRect(baseX + 16, baseY + 7, 4, 7, darkMetal);
+  fillRect(baseX + 9, baseY + 8, 7, 9, grip);
+  fillRect(baseX + 8, baseY + 13, 5, 4, darkMetal);
+  fillRect(baseX + 20, baseY + 7, 2, 2, metal);
+
+  bool muzzleFlash =
+    nowMs < shotUntilMs && (shotUntilMs - nowMs) > (FACE_SHOOT_MS - WEAPON_FLASH_MS);
+  if (muzzleFlash) {
+    fillRect(baseX + 22, baseY + 5, 3, 4, muzzle);
+    putPixel(baseX + 25, baseY + 6, muzzleHot);
+    putPixel(baseX + 25, baseY + 7, muzzle);
+    putPixel(baseX + 24, baseY + 4, muzzleHot);
+    putPixel(baseX + 24, baseY + 9, muzzle);
+  }
+
+  putPixel(RENDER_W / 2, (RENDER_H / 2) + 2, Color565::rgb(240, 240, 240));
+  putPixel((RENDER_W / 2) - 2, (RENDER_H / 2) + 2, Color565::rgb(200, 200, 200));
+  putPixel((RENDER_W / 2) + 2, (RENDER_H / 2) + 2, Color565::rgb(200, 200, 200));
 }
 
 void Wolf3DGame::renderColumn(
@@ -522,6 +684,17 @@ void Wolf3DGame::putPixel(int x, int y, uint16_t color565) {
     return;
   }
   frameBuffer[y * RENDER_W + x] = color565;
+}
+
+void Wolf3DGame::fillRect(int x0, int y0, int w, int h, uint16_t color565) {
+  if (w <= 0 || h <= 0) {
+    return;
+  }
+  for (int y = y0; y < y0 + h; y++) {
+    for (int x = x0; x < x0 + w; x++) {
+      putPixel(x, y, color565);
+    }
+  }
 }
 
 uint16_t Wolf3DGame::shadeColor(uint16_t color565, float distance, bool side) const {

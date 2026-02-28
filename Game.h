@@ -10,6 +10,7 @@
 #include "SGF/IScreen.h"
 #include "Hud.h"
 #include "Map.h"
+#include "Zombie.h"
 
 class Wolf3DGame : public Game {
 public:
@@ -45,6 +46,7 @@ private:
   static constexpr int START_ENERGY = 100;
   static constexpr int DAMAGE_ON_BUMP = 6;
   static constexpr float DOOR_REACH = 0.85f;
+  static constexpr uint32_t WEAPON_FLASH_MS = 90;
   static constexpr uint32_t BUMP_DAMAGE_COOLDOWN_MS = 260;
   static constexpr uint32_t FACE_BLINK_MS = 120;
   static constexpr uint32_t FACE_SHOOT_MS = 150;
@@ -90,6 +92,7 @@ private:
 
   uint16_t frameBuffer[RENDER_W * RENDER_H]{};
   uint16_t upscaleBuffer[MAX_SCREEN_W * UPSCALE]{};
+  float wallDepth[RENDER_W]{};
 
   float playerX = 3.5f;
   float playerY = 3.5f;
@@ -114,6 +117,8 @@ private:
   int mapWidth = 0;
   int mapHeight = 0;
   Map::Spawn spawn;
+  Zombie zombies[Zombie::MAX_COUNT]{};
+  int zombieCount = 0;
 
   void onSetup() override;
   void onPhysics(float delta) override;
@@ -121,6 +126,7 @@ private:
 
   void resetMap();
   void resetPlayerPose();
+  Zombie::WorldView makeZombieWorldView(uint32_t nowMs, float delta) const;
   bool wallAt(int cellX, int cellY) const;
   bool attemptMove(float nextX, float nextY);
   void onBlockedMove();
@@ -130,6 +136,7 @@ private:
   void shoot();
   void applyDamage(int amount);
   void updateInput(float delta);
+  void updateZombies(float delta);
   void updateHudAnimation();
   Hud::FaceMood currentFaceMood(uint32_t nowMs) const;
 
@@ -138,6 +145,8 @@ private:
   void clearFrame();
   void renderFloor();
   void renderWorld();
+  void renderZombies(uint32_t nowMs);
+  void renderWeapon(uint32_t nowMs);
   void renderColumn(
     int x,
     int drawStart,
@@ -146,6 +155,7 @@ private:
     int texX,
     float distance,
     bool side);
+  void fillRect(int x0, int y0, int w, int h, uint16_t color565);
   void putPixel(int x, int y, uint16_t color565);
   uint16_t shadeColor(uint16_t color565, float distance, bool side) const;
   uint16_t wallColor(uint8_t tile) const;
