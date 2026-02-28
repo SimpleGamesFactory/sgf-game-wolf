@@ -37,6 +37,22 @@ uint16_t applyDamageFlash(uint16_t color565, uint8_t strength) {
   return static_cast<uint16_t>((r5 << 11) | (g6 << 5) | b5);
 }
 
+uint16_t applyShotFlash(uint16_t color565, uint8_t strength) {
+  if (strength == 0) {
+    return color565;
+  }
+
+  uint8_t r5 = (color565 >> 11) & 0x1F;
+  uint8_t g6 = (color565 >> 5) & 0x3F;
+  uint8_t b5 = color565 & 0x1F;
+
+  r5 = static_cast<uint8_t>(r5 + (((31u - r5) * strength) >> 8));
+  g6 = static_cast<uint8_t>(g6 + (((63u - g6) * strength) >> 9));
+  b5 = static_cast<uint8_t>(b5 + (((31u - b5) * strength) >> 10));
+
+  return static_cast<uint16_t>((r5 << 11) | (g6 << 5) | b5);
+}
+
 uint8_t damageFlashStrength(uint32_t nowMs, uint32_t damageFlashUntilMs, uint32_t durationMs) {
   if (damageFlashUntilMs == 0 || nowMs >= damageFlashUntilMs || durationMs == 0) {
     return 0;
@@ -46,6 +62,24 @@ uint8_t damageFlashStrength(uint32_t nowMs, uint32_t damageFlashUntilMs, uint32_
   uint32_t strength = (remainingMs * 224u) / durationMs;
   if (strength > 224u) {
     strength = 224u;
+  }
+  return static_cast<uint8_t>(strength);
+}
+
+uint8_t shotFlashStrength(uint32_t nowMs, uint32_t shotUntilMs, uint32_t durationMs) {
+  if (shotUntilMs == 0 || nowMs >= shotUntilMs || durationMs == 0) {
+    return 0;
+  }
+
+  uint32_t activeStartMs = shotUntilMs > durationMs ? (shotUntilMs - durationMs) : 0;
+  if (nowMs < activeStartMs) {
+    return 0;
+  }
+
+  uint32_t remainingMs = shotUntilMs - nowMs;
+  uint32_t strength = (remainingMs * 112u) / durationMs;
+  if (strength > 112u) {
+    strength = 112u;
   }
   return static_cast<uint8_t>(strength);
 }
@@ -350,25 +384,7 @@ void Wolf3DGame::updateInput(float delta) {
   }
   minimapShortcutHeld = minimapShortcut;
 
-  bool floorTextureShortcut =
-    leftAction.pressed() &&
-    rightAction.pressed() &&
-    upAction.pressed() &&
-    downAction.pressed() &&
-    !fireAction.pressed();
-  if (floorTextureShortcut && !floorTextureShortcutHeld) {
-    floorTextureEnabled = !floorTextureEnabled;
-  }
-  floorTextureShortcutHeld = floorTextureShortcut;
-  if (floorTextureShortcut) {
-    return;
-  }
-
-  if (fireAction.justPressed() &&
-      !upAction.pressed() &&
-      !downAction.pressed() &&
-      !leftAction.pressed() &&
-      !rightAction.pressed()) {
+  if (fireAction.justPressed()) {
     if (!toggleDoorAhead()) {
       shoot();
     }
@@ -489,10 +505,12 @@ void Wolf3DGame::renderFrame() {
 }
 
 void Wolf3DGame::presentFrame() {
-  uint8_t flashStrength = damageFlashStrength(millis(), damageFlashUntilMs, DAMAGE_FLASH_MS);
+  uint32_t nowMs = millis();
+  uint8_t hitFlashStrength = damageFlashStrength(nowMs, damageFlashUntilMs, DAMAGE_FLASH_MS);
+  uint8_t muzzleFlashStrength = shotFlashStrength(nowMs, shotUntilMs, WEAPON_FLASH_MS);
   for (int y = 0; y < RENDER_H; y++) {
     const uint16_t* src = &frameBuffer[y * RENDER_W];
-    if (flashStrength == 0) {
+    if (hitFlashStrength == 0 && muzzleFlashStrength == 0) {
       for (int x = 0; x < RENDER_W; x++) {
         uint16_t color565 = src[x];
         int dstX = x * UPSCALE;
@@ -503,7 +521,13 @@ void Wolf3DGame::presentFrame() {
       }
     } else {
       for (int x = 0; x < RENDER_W; x++) {
-        uint16_t color565 = applyDamageFlash(src[x], flashStrength);
+        uint16_t color565 = src[x];
+        if (muzzleFlashStrength > 0) {
+          color565 = applyShotFlash(color565, muzzleFlashStrength);
+        }
+        if (hitFlashStrength > 0) {
+          color565 = applyDamageFlash(color565, hitFlashStrength);
+        }
         int dstX = x * UPSCALE;
         upscaleBuffer[dstX] = color565;
         upscaleBuffer[dstX + 1] = color565;
@@ -547,28 +571,16 @@ void Wolf3DGame::clearFrame() {
 }
 
 void Wolf3DGame::renderFloor() {
-  if (floorTextureEnabled) {
-    FloorRenderer::render(
-      frameBuffer,
-      RENDER_W,
-      RENDER_H,
-      playerX,
-      playerY,
-      dirX,
-      dirY,
-      planeX,
-      planeY);
-    return;
-  }
-
-  const int halfH = RENDER_H / 2;
-  const uint16_t floorColor = Color565::rgb(60, 52, 46);
-  for (int y = halfH + 1; y < RENDER_H; y++) {
-    uint16_t* row = &frameBuffer[y * RENDER_W];
-    for (int x = 0; x < RENDER_W; x++) {
-      row[x] = floorColor;
-    }
-  }
+  FloorRenderer::render(
+    frameBuffer,
+    RENDER_W,
+    RENDER_H,
+    playerX,
+    playerY,
+    dirX,
+    dirY,
+    planeX,
+    planeY);
 }
 
 void Wolf3DGame::renderWorld() {

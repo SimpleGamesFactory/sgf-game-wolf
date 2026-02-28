@@ -110,8 +110,6 @@ private:
   int energy = START_ENERGY;
   bool showMinimap = false;
   bool minimapShortcutHeld = false;
-  bool floorTextureEnabled = true;
-  bool floorTextureShortcutHeld = false;
   uint32_t damageFlashUntilMs = 0;
   uint32_t nextBlinkMs = 0;
   uint32_t blinkUntilMs = 0;
