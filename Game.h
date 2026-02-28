@@ -9,6 +9,7 @@
 #include "SGF/IRenderTarget.h"
 #include "SGF/IScreen.h"
 #include "Hud.h"
+#include "Map.h"
 
 class Wolf3DGame : public Game {
 public:
@@ -31,8 +32,8 @@ private:
   static constexpr int RENDER_W = MAX_SCREEN_W / UPSCALE;
   static constexpr int RENDER_H = WORLD_H / UPSCALE;
   static constexpr int TEX_SIZE = 16;
-  static constexpr int MAP_W = 16;
-  static constexpr int MAP_H = 16;
+  static constexpr int MAP_MAX_W = Map::MAX_WIDTH;
+  static constexpr int MAP_MAX_H = Map::MAX_HEIGHT;
   static constexpr float MOVE_SPEED = 2.2f;
   static constexpr float STRAFE_SPEED = 1.8f;
   static constexpr float TURN_SPEED = 1.8f;
@@ -108,10 +109,11 @@ private:
   uint32_t hurtUntilMs = 0;
   uint32_t nextDamageMs = 0;
   Hud hud;
-  uint8_t map[MAP_H][MAP_W]{};
-  bool doorOpen[MAP_H][MAP_W]{};
-
-  static const uint8_t INITIAL_MAP[MAP_H][MAP_W];
+  uint8_t map[MAP_MAX_H][MAP_MAX_W]{};
+  bool doorOpen[MAP_MAX_H][MAP_MAX_W]{};
+  int mapWidth = 0;
+  int mapHeight = 0;
+  Map::Spawn spawn;
 
   void onSetup() override;
   void onPhysics(float delta) override;

@@ -69,6 +69,7 @@ void Minimap::render(
   int height,
   const uint8_t* map,
   const bool* doorOpen,
+  int mapStride,
   int mapW,
   int mapH,
   float playerX,
@@ -90,8 +91,8 @@ void Minimap::render(
 
   for (int y = 0; y < mapH; y++) {
     for (int x = 0; x < mapW; x++) {
-      uint8_t tile = map[y * mapW + x];
-      bool isOpen = doorOpen && doorOpen[y * mapW + x];
+      uint8_t tile = map[y * mapStride + x];
+      bool isOpen = doorOpen && doorOpen[y * mapStride + x];
       uint16_t color565 = tile ? tileColor(tile, isOpen) : Color565::rgb(18, 22, 26);
       drawRect(
         buffer,

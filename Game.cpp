@@ -4,28 +4,10 @@
 #include <math.h>
 
 #include "Door.h"
+#include "Map.h"
 #include "Minimap.h"
 #include "SGF/Color565.h"
 #include "SGF/Math.h"
-
-const uint8_t Wolf3DGame::INITIAL_MAP[MAP_H][MAP_W] = {
-  {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-  {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-  {1, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 1},
-  {1, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 1},
-  {1, 0, 2, 0, 0, 1, 1, 3, 0, 0, 0, 4, 0, 0, 0, 1},
-  {1, 0, 2, 0, 0, 'D', 0, 0, 0, 5, 5, 5, 0, 0, 0, 1},
-  {1, 0, 2, 0, 0, 1, 0, 0, 0, 5, 0, 0, 0, 0, 0, 1},
-  {1, 0, 0, 0, 0, 1, 0, 0, 0, 5, 0, 0, 6, 6, 0, 1},
-  {1, 0, 7, 7, 7, 1, 0, 0, 0, 5, 0, 0, 6, 0, 0, 1},
-  {1, 0, 7, 0, 0, 0, 0, 0, 0, 5, 0, 0, 6, 0, 0, 1},
-  {1, 0, 7, 0, 0, 0, 8, 8, 8, 8, 0, 0, 6, 0, 0, 1},
-  {1, 0, 7, 0, 0, 0, 8, 0, 0, 8, 0, 0, 0, 0, 0, 1},
-  {1, 0, 0, 0, 0, 0, 8, 0, 0, 8, 0, 0, 9, 9, 0, 1},
-  {1, 0, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 9, 0, 0, 1},
-  {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-  {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-};
 
 Wolf3DGame::Wolf3DGame(
   IRenderTarget& renderTargetRef,
@@ -124,25 +106,31 @@ void Wolf3DGame::onProcess(float delta) {
 }
 
 void Wolf3DGame::resetMap() {
-  for (int y = 0; y < MAP_H; y++) {
-    for (int x = 0; x < MAP_W; x++) {
-      map[y][x] = INITIAL_MAP[y][x];
-      doorOpen[y][x] = false;
-    }
-  }
+  Map::load(map, doorOpen, mapWidth, mapHeight, spawn);
 }
 
 void Wolf3DGame::resetPlayerPose() {
-  playerX = 3.5f;
-  playerY = 3.5f;
-  dirX = 1.0f;
-  dirY = 0.0f;
+  playerX = spawn.x;
+  playerY = spawn.y;
+  dirX = spawn.dirX;
+  dirY = spawn.dirY;
   planeX = 0.0f;
   planeY = CAMERA_PLANE_SCALE;
+  if (dirX == 1.0f && dirY == 0.0f) {
+    planeY = CAMERA_PLANE_SCALE;
+  } else if (dirX == -1.0f && dirY == 0.0f) {
+    planeY = -CAMERA_PLANE_SCALE;
+  } else if (dirX == 0.0f && dirY == -1.0f) {
+    planeX = CAMERA_PLANE_SCALE;
+    planeY = 0.0f;
+  } else if (dirX == 0.0f && dirY == 1.0f) {
+    planeX = -CAMERA_PLANE_SCALE;
+    planeY = 0.0f;
+  }
 }
 
 bool Wolf3DGame::wallAt(int cellX, int cellY) const {
-  if (cellX < 0 || cellX >= MAP_W || cellY < 0 || cellY >= MAP_H) {
+  if (cellX < 0 || cellX >= mapWidth || cellY < 0 || cellY >= mapHeight) {
     return true;
   }
   uint8_t tile = map[cellY][cellX];
@@ -192,7 +180,7 @@ void Wolf3DGame::rotate(float angle) {
 bool Wolf3DGame::toggleDoorAhead() {
   int cellX = static_cast<int>(playerX + dirX * DOOR_REACH);
   int cellY = static_cast<int>(playerY + dirY * DOOR_REACH);
-  if (cellX < 0 || cellX >= MAP_W || cellY < 0 || cellY >= MAP_H) {
+  if (cellX < 0 || cellX >= mapWidth || cellY < 0 || cellY >= mapHeight) {
     return false;
   }
   if (!Door::isTile(map[cellY][cellX])) {
@@ -343,8 +331,9 @@ void Wolf3DGame::renderFrame() {
       RENDER_H,
       &map[0][0],
       &doorOpen[0][0],
-      MAP_W,
-      MAP_H,
+      MAP_MAX_W,
+      mapWidth,
+      mapHeight,
       playerX,
       playerY,
       dirX,
@@ -482,7 +471,7 @@ void Wolf3DGame::renderWorld() {
     }
 
     uint8_t tile = 1;
-    if (mapX >= 0 && mapX < MAP_W && mapY >= 0 && mapY < MAP_H) {
+    if (mapX >= 0 && mapX < mapWidth && mapY >= 0 && mapY < mapHeight) {
       tile = map[mapY][mapX];
     }
 

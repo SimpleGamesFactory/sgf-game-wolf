@@ -10,6 +10,7 @@ public:
     int height,
     const uint8_t* map,
     const bool* doorOpen,
+    int mapStride,
     int mapW,
     int mapH,
     float playerX,
