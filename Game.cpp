@@ -616,19 +616,34 @@ void Wolf3DGame::presentFrame() {
   uint8_t hitFlashStrength = damageFlashStrength(nowMs, damageFlashUntilMs, DAMAGE_FLASH_MS);
   uint8_t muzzleFlashStrength = shotFlashStrength(nowMs, shotUntilMs, WEAPON_FLASH_MS);
   const bool streamViewport = renderTarget.supportsBlit565Stream();
+  const bool preSwappedStreamViewport =
+    streamViewport && renderTarget.supportsPreSwappedBlit565Stream();
+  const bool queuedPreSwappedStreamViewport =
+    preSwappedStreamViewport && renderTarget.supportsQueuedPreSwappedBlit565Stream();
+  int queuedChunks = 0;
+  int chunkIndex = 0;
   if (streamViewport) {
     renderTarget.beginBlit565Stream(0, 0, screenW, worldScreenH);
   }
   for (int srcY0 = 0; srcY0 < RENDER_H; srcY0 += UPSCALE_CHUNK_SRC_ROWS) {
+    if (queuedPreSwappedStreamViewport && queuedChunks >= UPSCALE_BUFFER_COUNT) {
+      renderTarget.waitQueuedPreSwappedBlit565StreamSlot();
+      queuedChunks--;
+    }
     int srcRows = Math::clamp(UPSCALE_CHUNK_SRC_ROWS, 1, RENDER_H - srcY0);
     int dstRows = srcRows * UPSCALE;
+    uint16_t* activeUpscaleBuffer = upscaleBuffers[chunkIndex % UPSCALE_BUFFER_COUNT];
+    chunkIndex++;
     for (int localY = 0; localY < srcRows; localY++) {
       const uint16_t* src = &frameBuffer[(srcY0 + localY) * RENDER_W];
-      uint16_t* dstRow0 = &upscaleBuffer[(localY * UPSCALE) * screenW];
+      uint16_t* dstRow0 = &activeUpscaleBuffer[(localY * UPSCALE) * screenW];
       uint16_t* dstRow1 = dstRow0 + screenW;
       if (hitFlashStrength == 0 && muzzleFlashStrength == 0) {
         for (int x = 0; x < RENDER_W; x++) {
           uint16_t color565 = src[x];
+          if (preSwappedStreamViewport) {
+            color565 = Color565::bswap(color565);
+          }
           int dstX = x * UPSCALE;
           dstRow0[dstX] = color565;
           dstRow0[dstX + 1] = color565;
@@ -644,6 +659,9 @@ void Wolf3DGame::presentFrame() {
           if (hitFlashStrength > 0) {
             color565 = applyDamageFlash(color565, hitFlashStrength);
           }
+          if (preSwappedStreamViewport) {
+            color565 = Color565::bswap(color565);
+          }
           int dstX = x * UPSCALE;
           dstRow0[dstX] = color565;
           dstRow0[dstX + 1] = color565;
@@ -653,9 +671,20 @@ void Wolf3DGame::presentFrame() {
       }
     }
     if (streamViewport) {
-      renderTarget.writeBlit565StreamChunk(upscaleBuffer, static_cast<size_t>(screenW * dstRows));
+      if (queuedPreSwappedStreamViewport) {
+        renderTarget.queuePreSwappedBlit565StreamChunk(
+          activeUpscaleBuffer,
+          static_cast<size_t>(screenW * dstRows));
+        queuedChunks++;
+      } else if (preSwappedStreamViewport) {
+        renderTarget.writePreSwappedBlit565StreamChunk(
+          activeUpscaleBuffer,
+          static_cast<size_t>(screenW * dstRows));
+      } else {
+        renderTarget.writeBlit565StreamChunk(activeUpscaleBuffer, static_cast<size_t>(screenW * dstRows));
+      }
     } else {
-      renderTarget.blit565(0, srcY0 * UPSCALE, screenW, dstRows, upscaleBuffer);
+      renderTarget.blit565(0, srcY0 * UPSCALE, screenW, dstRows, activeUpscaleBuffer);
     }
   }
   if (streamViewport) {
@@ -1016,11 +1045,19 @@ void Wolf3DGame::renderColumn(
   if (span <= 0) {
     return;
   }
+  uint16_t shadedColumn[TEX_SIZE];
+  for (int texY = 0; texY < TEX_SIZE; texY++) {
+    shadedColumn[texY] = shadeColor(wallTexel(tile, texX, texY), distance, side);
+  }
+  int texStep = (TEX_SIZE << 16) / span;
+  int texPos = 0;
   for (int y = drawStart; y <= drawEnd; y++) {
-    int texY = ((y - drawStart) * TEX_SIZE) / span;
-    texY = Math::clamp(texY, 0, TEX_SIZE - 1);
-    uint16_t color565 = wallTexel(tile, texX, texY);
-    frameBuffer[y * RENDER_W + x] = shadeColor(color565, distance, side);
+    int texY = texPos >> 16;
+    if (texY >= TEX_SIZE) {
+      texY = TEX_SIZE - 1;
+    }
+    frameBuffer[y * RENDER_W + x] = shadedColumn[texY];
+    texPos += texStep;
   }
 }
 

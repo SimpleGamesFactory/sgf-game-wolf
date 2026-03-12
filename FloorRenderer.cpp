@@ -1,6 +1,7 @@
 #include "FloorRenderer.h"
 
 #include <math.h>
+#include <string.h>
 
 #include "SGF/Color565.h"
 
@@ -8,6 +9,7 @@ namespace FloorRenderer {
 namespace {
 
 constexpr int TEX_SIZE = 16;
+constexpr int FLOOR_ROW_STRIDE = 2;
 
 uint16_t shadeColor(uint16_t color565, float distance) {
   float brightness = 1.0f / (1.0f + distance * 0.16f);
@@ -78,7 +80,7 @@ void render(
   const float rayDirY1 = dirY + planeY;
   const float cameraZ = static_cast<float>(height) * 0.5f;
 
-  for (int y = halfH + 1; y < height; y++) {
+  for (int y = halfH + 1; y < height; y += FLOOR_ROW_STRIDE) {
     int rowOffset = y - halfH;
     if (rowOffset <= 0) {
       continue;
@@ -91,6 +93,7 @@ void render(
     float floorY = playerY + rowDistance * rayDirY0;
 
     uint16_t* row = &frameBuffer[y * width];
+    uint16_t* nextRow = (y + 1 < height) ? &frameBuffer[(y + 1) * width] : nullptr;
     for (int x = 0; x < width; x++) {
       int cellX = static_cast<int>(floorf(floorX));
       int cellY = static_cast<int>(floorf(floorY));
@@ -102,6 +105,10 @@ void render(
       row[x] = shadeColor(floorTexel(texX, texY, cellX, cellY), rowDistance);
       floorX += floorStepX;
       floorY += floorStepY;
+    }
+
+    if (nextRow != nullptr) {
+      memcpy(nextRow, row, static_cast<size_t>(width) * sizeof(uint16_t));
     }
   }
 }

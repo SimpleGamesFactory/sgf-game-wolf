@@ -35,6 +35,7 @@ private:
   static constexpr int WORLD_H = MAX_SCREEN_H - HUD_H;
   static constexpr int UPSCALE = 2;
   static constexpr int UPSCALE_CHUNK_SRC_ROWS = 3;
+  static constexpr int UPSCALE_BUFFER_COUNT = 2;
   static constexpr int RENDER_W = MAX_SCREEN_W / UPSCALE;
   static constexpr int RENDER_H = WORLD_H / UPSCALE;
   static constexpr int TEX_SIZE = 16;
@@ -96,7 +97,7 @@ private:
   ActionState fireAction;
 
   uint16_t frameBuffer[RENDER_W * RENDER_H]{};
-  uint16_t upscaleBuffer[MAX_SCREEN_W * UPSCALE * UPSCALE_CHUNK_SRC_ROWS]{};
+  uint16_t upscaleBuffers[UPSCALE_BUFFER_COUNT][MAX_SCREEN_W * UPSCALE * UPSCALE_CHUNK_SRC_ROWS]{};
   float wallDepth[RENDER_W]{};
 
   float playerX = 3.5f;
