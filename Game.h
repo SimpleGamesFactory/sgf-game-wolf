@@ -33,7 +33,7 @@ private:
   static constexpr int MAX_SCREEN_H = 240;
   static constexpr int HUD_H = 40;
   static constexpr int WORLD_AREA_H = MAX_SCREEN_H - HUD_H;
-  static constexpr int VIEWPORT_W = 200;
+  static constexpr int VIEWPORT_W = 240;
   static constexpr int VIEWPORT_H = 180;
   static constexpr int VIEWPORT_X = (MAX_SCREEN_W - VIEWPORT_W) / 2;
   static constexpr int VIEWPORT_Y = (WORLD_AREA_H - VIEWPORT_H) / 2;

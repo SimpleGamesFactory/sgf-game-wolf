@@ -875,6 +875,10 @@ void Wolf3DGame::renderKeys() {
       if (!Keys::isPickup(tile)) {
         continue;
       }
+      const uint16_t* keyTexture = Keys::texture(tile);
+      if (keyTexture == nullptr) {
+        continue;
+      }
 
       float spriteX = (static_cast<float>(mapX) + 0.5f) - playerX;
       float spriteY = (static_cast<float>(mapY) + 0.5f) - playerY;
@@ -892,8 +896,11 @@ void Wolf3DGame::renderKeys() {
         spriteWidth = 4;
       }
 
-      int drawStartY = (-spriteHeight / 2) + (RENDER_H / 2);
-      int drawEndY = (spriteHeight / 2) + (RENDER_H / 2);
+      int pickupDrop = spriteHeight / 3;
+      int rawDrawStartY = (-spriteHeight / 2) + (RENDER_H / 2) + pickupDrop;
+      int rawDrawEndY = (spriteHeight / 2) + (RENDER_H / 2) + pickupDrop;
+      int drawStartY = rawDrawStartY;
+      int drawEndY = rawDrawEndY;
       drawStartY = Math::clamp(drawStartY, 0, RENDER_H - 1);
       drawEndY = Math::clamp(drawEndY, 0, RENDER_H - 1);
 
@@ -901,23 +908,37 @@ void Wolf3DGame::renderKeys() {
       int drawEndX = spriteScreenX + spriteWidth / 2;
       drawStartX = Math::clamp(drawStartX, 0, RENDER_W - 1);
       drawEndX = Math::clamp(drawEndX, 0, RENDER_W - 1);
+      int texXStep = (Keys::TEX_SIZE << 16) / Math::clamp(spriteWidth, 1, RENDER_W);
+      int texXPos = ((drawStartX - (spriteScreenX - spriteWidth / 2)) * Keys::TEX_SIZE << 16) /
+                    Math::clamp(spriteWidth, 1, RENDER_W);
+      uint16_t shadedTexture[Keys::TEX_SIZE * Keys::TEX_SIZE];
+      for (int i = 0; i < Keys::TEX_SIZE * Keys::TEX_SIZE; i++) {
+        uint16_t color565 = keyTexture[i];
+        shadedTexture[i] = (color565 == 0) ? 0 : shadeColor(color565, transformY, false);
+      }
 
       for (int stripe = drawStartX; stripe <= drawEndX; stripe++) {
         if (transformY >= wallDepth[stripe]) {
+          texXPos += texXStep;
           continue;
         }
 
-        int texX = ((stripe - drawStartX) * 16) / Math::clamp(spriteWidth, 1, RENDER_W);
-        texX = Math::clamp(texX, 0, 15);
+        int texX = texXPos >> 16;
+        texX = Math::clamp(texX, 0, Keys::TEX_SIZE - 1);
+        texXPos += texXStep;
+        int texYStep = (Keys::TEX_SIZE << 16) / Math::clamp(spriteHeight, 1, RENDER_H);
+        int texYPos = ((drawStartY - rawDrawStartY) * Keys::TEX_SIZE << 16) /
+                      Math::clamp(spriteHeight, 1, RENDER_H);
 
         for (int y = drawStartY; y <= drawEndY; y++) {
-          int texY = ((y - drawStartY) * 16) / Math::clamp(spriteHeight, 1, RENDER_H);
-          texY = Math::clamp(texY, 0, 15);
-          uint16_t color565 = Keys::texel(tile, texX, texY);
+          int texY = texYPos >> 16;
+          texY = Math::clamp(texY, 0, Keys::TEX_SIZE - 1);
+          texYPos += texYStep;
+          uint16_t color565 = shadedTexture[texY * Keys::TEX_SIZE + texX];
           if (color565 == 0) {
             continue;
           }
-          frameBuffer[y * RENDER_W + stripe] = shadeColor(color565, transformY, false);
+          frameBuffer[y * RENDER_W + stripe] = color565;
         }
       }
     }
@@ -972,7 +993,7 @@ void Wolf3DGame::renderZombies(uint32_t nowMs) {
       spriteWidth = 4;
     }
 
-    int drawStartY = (-spriteHeight / 2) + (RENDER_H / 2);
+      int drawStartY = (-spriteHeight / 2) + (RENDER_H / 2);
     int drawEndY = (spriteHeight / 2) + (RENDER_H / 2);
     drawStartY = Math::clamp(drawStartY, 0, RENDER_H - 1);
     drawEndY = Math::clamp(drawEndY, 0, RENDER_H - 1);
@@ -981,25 +1002,41 @@ void Wolf3DGame::renderZombies(uint32_t nowMs) {
     int drawEndX = spriteScreenX + spriteWidth / 2;
     drawStartX = Math::clamp(drawStartX, 0, RENDER_W - 1);
     drawEndX = Math::clamp(drawEndX, 0, RENDER_W - 1);
+    int texXStep = (Zombie::TEX_SIZE << 16) / Math::clamp(spriteWidth, 1, RENDER_W);
+    int texXPos = ((drawStartX - (spriteScreenX - spriteWidth / 2)) * Zombie::TEX_SIZE << 16) /
+                  Math::clamp(spriteWidth, 1, RENDER_W);
+    int texYStep = (Zombie::TEX_SIZE << 16) / Math::clamp(spriteHeight, 1, RENDER_H);
+    int rawDrawStartY = (-spriteHeight / 2) + (RENDER_H / 2);
+    uint16_t shadedTexture[Zombie::TEX_SIZE * Zombie::TEX_SIZE];
+    for (int texY = 0; texY < Zombie::TEX_SIZE; texY++) {
+      for (int texX = 0; texX < Zombie::TEX_SIZE; texX++) {
+        uint16_t color565 = zombie.texel(texX, texY, nowMs);
+        shadedTexture[texY * Zombie::TEX_SIZE + texX] =
+          (color565 == 0) ? 0 : shadeColor(color565, transformY, false);
+      }
+    }
 
     for (int stripe = drawStartX; stripe <= drawEndX; stripe++) {
       if (transformY >= wallDepth[stripe]) {
+        texXPos += texXStep;
         continue;
       }
 
-      int texX =
-        ((stripe - drawStartX) * Zombie::TEX_SIZE) / Math::clamp(spriteWidth, 1, RENDER_W);
+      int texX = texXPos >> 16;
       texX = Math::clamp(texX, 0, Zombie::TEX_SIZE - 1);
+      texXPos += texXStep;
+      int texYPos = ((drawStartY - rawDrawStartY) * Zombie::TEX_SIZE << 16) /
+                    Math::clamp(spriteHeight, 1, RENDER_H);
 
       for (int y = drawStartY; y <= drawEndY; y++) {
-        int texY =
-          ((y - drawStartY) * Zombie::TEX_SIZE) / Math::clamp(spriteHeight, 1, RENDER_H);
+        int texY = texYPos >> 16;
         texY = Math::clamp(texY, 0, Zombie::TEX_SIZE - 1);
-        uint16_t color565 = zombie.texel(texX, texY, nowMs);
+        texYPos += texYStep;
+        uint16_t color565 = shadedTexture[texY * Zombie::TEX_SIZE + texX];
         if (color565 == 0) {
           continue;
         }
-        frameBuffer[y * RENDER_W + stripe] = shadeColor(color565, transformY, false);
+        frameBuffer[y * RENDER_W + stripe] = color565;
       }
     }
   }

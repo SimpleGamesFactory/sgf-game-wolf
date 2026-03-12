@@ -5,12 +5,83 @@
 namespace Keys {
 namespace {
 
-uint16_t darkVariant(uint16_t color565) {
-  return Color565::darken(color565);
-}
+constexpr int KEY_COLOR_COUNT = 3;
 
 uint16_t lightVariant(uint16_t color565) {
   return Color565::lighten(color565);
+}
+
+int colorIndex(KeyColor color) {
+  switch (color) {
+    case KeyColor::Red: return 0;
+    case KeyColor::Green: return 1;
+    case KeyColor::Blue: return 2;
+    default: return -1;
+  }
+}
+
+uint16_t buildTexel(KeyColor color, int texX, int texY) {
+  if (color == KeyColor::None) {
+    return 0;
+  }
+
+  uint16_t base = color565(color);
+  uint16_t light = lightVariant(base);
+  uint16_t metal = Color565::rgb(216, 206, 170);
+  uint16_t metalDark = Color565::rgb(128, 118, 92);
+
+  bool ring =
+    ((texX - 4) * (texX - 4) + (texY - 5) * (texY - 5) <= 12) &&
+    ((texX - 4) * (texX - 4) + (texY - 5) * (texY - 5) >= 4);
+  bool shaft = texX >= 5 && texX <= 7 && texY >= 5 && texY <= 12;
+  bool toothA = texX >= 7 && texX <= 10 && texY >= 10 && texY <= 11;
+  bool toothB = texX >= 7 && texX <= 9 && texY >= 7 && texY <= 8;
+  bool gem = texX >= 2 && texX <= 6 && texY >= 3 && texY <= 7;
+  bool gemHighlight = texX >= 3 && texX <= 4 && texY >= 4 && texY <= 5;
+
+  if (!(ring || shaft || toothA || toothB || gem)) {
+    return 0;
+  }
+  if (gemHighlight) {
+    return light;
+  }
+  if (gem) {
+    return base;
+  }
+  if ((texX == 5 || texX == 7) && texY >= 5 && texY <= 12) {
+    return metalDark;
+  }
+  if (toothA || toothB) {
+    return metalDark;
+  }
+  return metal;
+}
+
+const uint16_t* textureForColor(KeyColor color) {
+  static bool initialized = false;
+  static uint16_t textures[KEY_COLOR_COUNT][TEX_SIZE * TEX_SIZE];
+  if (!initialized) {
+    for (int colorIdx = 0; colorIdx < KEY_COLOR_COUNT; colorIdx++) {
+      KeyColor buildColor = KeyColor::Red;
+      if (colorIdx == 1) {
+        buildColor = KeyColor::Green;
+      } else if (colorIdx == 2) {
+        buildColor = KeyColor::Blue;
+      }
+      for (int texY = 0; texY < TEX_SIZE; texY++) {
+        for (int texX = 0; texX < TEX_SIZE; texX++) {
+          textures[colorIdx][texY * TEX_SIZE + texX] = buildTexel(buildColor, texX, texY);
+        }
+      }
+    }
+    initialized = true;
+  }
+
+  int idx = colorIndex(color);
+  if (idx < 0) {
+    return nullptr;
+  }
+  return textures[idx];
 }
 
 }  // namespace
@@ -51,42 +122,15 @@ uint16_t minimapColor(uint8_t tile) {
 }
 
 uint16_t texel(uint8_t tile, int texX, int texY) {
-  KeyColor color = colorForPickup(tile);
-  if (color == KeyColor::None) {
+  const uint16_t* tex = texture(tile);
+  if (tex == nullptr) {
     return 0;
   }
+  return tex[texY * TEX_SIZE + texX];
+}
 
-  uint16_t base = color565(color);
-  uint16_t dark = darkVariant(base);
-  uint16_t light = lightVariant(base);
-  uint16_t metal = Color565::rgb(216, 206, 170);
-  uint16_t metalDark = Color565::rgb(128, 118, 92);
-
-  bool ring =
-    ((texX - 4) * (texX - 4) + (texY - 5) * (texY - 5) <= 12) &&
-    ((texX - 4) * (texX - 4) + (texY - 5) * (texY - 5) >= 4);
-  bool shaft = texX >= 5 && texX <= 7 && texY >= 5 && texY <= 12;
-  bool toothA = texX >= 7 && texX <= 10 && texY >= 10 && texY <= 11;
-  bool toothB = texX >= 7 && texX <= 9 && texY >= 7 && texY <= 8;
-  bool gem = texX >= 2 && texX <= 6 && texY >= 3 && texY <= 7;
-  bool gemHighlight = texX >= 3 && texX <= 4 && texY >= 4 && texY <= 5;
-
-  if (!(ring || shaft || toothA || toothB || gem)) {
-    return 0;
-  }
-  if (gemHighlight) {
-    return light;
-  }
-  if (gem) {
-    return base;
-  }
-  if ((texX == 5 || texX == 7) && texY >= 5 && texY <= 12) {
-    return metalDark;
-  }
-  if (toothA || toothB) {
-    return metalDark;
-  }
-  return metal;
+const uint16_t* texture(uint8_t tile) {
+  return textureForColor(colorForPickup(tile));
 }
 
 }  // namespace Keys
