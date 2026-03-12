@@ -10,6 +10,7 @@ namespace {
 
 constexpr int TEX_SIZE = 16;
 constexpr int FLOOR_ROW_STRIDE = 2;
+constexpr int FLOOR_COL_STRIDE = 2;
 
 uint16_t shadeColor(uint16_t color565, float distance) {
   float brightness = 1.0f / (1.0f + distance * 0.16f);
@@ -94,7 +95,7 @@ void render(
 
     uint16_t* row = &frameBuffer[y * width];
     uint16_t* nextRow = (y + 1 < height) ? &frameBuffer[(y + 1) * width] : nullptr;
-    for (int x = 0; x < width; x++) {
+    for (int x = 0; x < width; x += FLOOR_COL_STRIDE) {
       int cellX = static_cast<int>(floorf(floorX));
       int cellY = static_cast<int>(floorf(floorY));
       float fracX = floorX - static_cast<float>(cellX);
@@ -102,9 +103,13 @@ void render(
       int texX = static_cast<int>(fracX * static_cast<float>(TEX_SIZE)) & (TEX_SIZE - 1);
       int texY = static_cast<int>(fracY * static_cast<float>(TEX_SIZE)) & (TEX_SIZE - 1);
 
-      row[x] = shadeColor(floorTexel(texX, texY, cellX, cellY), rowDistance);
-      floorX += floorStepX;
-      floorY += floorStepY;
+      uint16_t color565 = shadeColor(floorTexel(texX, texY, cellX, cellY), rowDistance);
+      row[x] = color565;
+      if (x + 1 < width) {
+        row[x + 1] = color565;
+      }
+      floorX += floorStepX * static_cast<float>(FLOOR_COL_STRIDE);
+      floorY += floorStepY * static_cast<float>(FLOOR_COL_STRIDE);
     }
 
     if (nextRow != nullptr) {

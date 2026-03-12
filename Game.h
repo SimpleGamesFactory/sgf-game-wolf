@@ -32,12 +32,16 @@ private:
   static constexpr int MAX_SCREEN_W = 240;
   static constexpr int MAX_SCREEN_H = 240;
   static constexpr int HUD_H = 40;
-  static constexpr int WORLD_H = MAX_SCREEN_H - HUD_H;
+  static constexpr int WORLD_AREA_H = MAX_SCREEN_H - HUD_H;
+  static constexpr int VIEWPORT_W = 200;
+  static constexpr int VIEWPORT_H = 180;
+  static constexpr int VIEWPORT_X = (MAX_SCREEN_W - VIEWPORT_W) / 2;
+  static constexpr int VIEWPORT_Y = (WORLD_AREA_H - VIEWPORT_H) / 2;
   static constexpr int UPSCALE = 2;
   static constexpr int UPSCALE_CHUNK_SRC_ROWS = 3;
   static constexpr int UPSCALE_BUFFER_COUNT = 2;
-  static constexpr int RENDER_W = MAX_SCREEN_W / UPSCALE;
-  static constexpr int RENDER_H = WORLD_H / UPSCALE;
+  static constexpr int RENDER_W = VIEWPORT_W / UPSCALE;
+  static constexpr int RENDER_H = VIEWPORT_H / UPSCALE;
   static constexpr int TEX_SIZE = 16;
   static constexpr int MAP_MAX_W = Map::MAX_WIDTH;
   static constexpr int MAP_MAX_H = Map::MAX_HEIGHT;
@@ -78,7 +82,7 @@ private:
   SGFHardware::HardwareProfile hardwareProfile;
   int screenW = 0;
   int screenH = 0;
-  int worldScreenH = WORLD_H;
+  int worldScreenH = WORLD_AREA_H;
 
   uint8_t pinLeft = 0;
   uint8_t pinRight = 0;

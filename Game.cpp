@@ -138,10 +138,19 @@ void Wolf3DGame::onSetup() {
   screenW = targetSize.x;
   screenH = targetSize.y;
   worldScreenH = screenH - HUD_H;
-  if (screenW != MAX_SCREEN_W || screenH != MAX_SCREEN_H || worldScreenH != WORLD_H) {
+  if (screenW != MAX_SCREEN_W || screenH != MAX_SCREEN_H || worldScreenH != WORLD_AREA_H) {
     while (true) {
       delay(1000);
     }
+  }
+  const uint16_t viewportBg = Color565::rgb(4, 5, 8);
+  if (VIEWPORT_Y > 0) {
+    screen.fillRect565(0, 0, screenW, VIEWPORT_Y, viewportBg);
+    screen.fillRect565(0, VIEWPORT_Y + VIEWPORT_H, screenW, worldScreenH - (VIEWPORT_Y + VIEWPORT_H), viewportBg);
+  }
+  if (VIEWPORT_X > 0) {
+    screen.fillRect565(0, VIEWPORT_Y, VIEWPORT_X, VIEWPORT_H, viewportBg);
+    screen.fillRect565(VIEWPORT_X + VIEWPORT_W, VIEWPORT_Y, screenW - (VIEWPORT_X + VIEWPORT_W), VIEWPORT_H, viewportBg);
   }
 
   leftPinInput.attach(pinLeft, true);
@@ -623,7 +632,7 @@ void Wolf3DGame::presentFrame() {
   int queuedChunks = 0;
   int chunkIndex = 0;
   if (streamViewport) {
-    renderTarget.beginBlit565Stream(0, 0, screenW, worldScreenH);
+    renderTarget.beginBlit565Stream(VIEWPORT_X, VIEWPORT_Y, VIEWPORT_W, VIEWPORT_H);
   }
   for (int srcY0 = 0; srcY0 < RENDER_H; srcY0 += UPSCALE_CHUNK_SRC_ROWS) {
     if (queuedPreSwappedStreamViewport && queuedChunks >= UPSCALE_BUFFER_COUNT) {
@@ -636,8 +645,8 @@ void Wolf3DGame::presentFrame() {
     chunkIndex++;
     for (int localY = 0; localY < srcRows; localY++) {
       const uint16_t* src = &frameBuffer[(srcY0 + localY) * RENDER_W];
-      uint16_t* dstRow0 = &activeUpscaleBuffer[(localY * UPSCALE) * screenW];
-      uint16_t* dstRow1 = dstRow0 + screenW;
+      uint16_t* dstRow0 = &activeUpscaleBuffer[(localY * UPSCALE) * VIEWPORT_W];
+      uint16_t* dstRow1 = dstRow0 + VIEWPORT_W;
       if (hitFlashStrength == 0 && muzzleFlashStrength == 0) {
         for (int x = 0; x < RENDER_W; x++) {
           uint16_t color565 = src[x];
@@ -674,17 +683,17 @@ void Wolf3DGame::presentFrame() {
       if (queuedPreSwappedStreamViewport) {
         renderTarget.queuePreSwappedBlit565StreamChunk(
           activeUpscaleBuffer,
-          static_cast<size_t>(screenW * dstRows));
+          static_cast<size_t>(VIEWPORT_W * dstRows));
         queuedChunks++;
       } else if (preSwappedStreamViewport) {
         renderTarget.writePreSwappedBlit565StreamChunk(
           activeUpscaleBuffer,
-          static_cast<size_t>(screenW * dstRows));
+          static_cast<size_t>(VIEWPORT_W * dstRows));
       } else {
-        renderTarget.writeBlit565StreamChunk(activeUpscaleBuffer, static_cast<size_t>(screenW * dstRows));
+        renderTarget.writeBlit565StreamChunk(activeUpscaleBuffer, static_cast<size_t>(VIEWPORT_W * dstRows));
       }
     } else {
-      renderTarget.blit565(0, srcY0 * UPSCALE, screenW, dstRows, activeUpscaleBuffer);
+      renderTarget.blit565(VIEWPORT_X, VIEWPORT_Y + srcY0 * UPSCALE, VIEWPORT_W, dstRows, activeUpscaleBuffer);
     }
   }
   if (streamViewport) {
