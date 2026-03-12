@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "SGF/DirtyRects.h"
-#include "SGF/IRenderTarget.h"
+#include "SGF/IPresentTarget.h"
 
 class Hud {
 public:
@@ -40,11 +40,11 @@ public:
   void setFaceMood(FaceMood value);
   void invalidate();
   void render();
-  void flush(IRenderTarget& target);
+  void flush(IPresentTarget& target);
 
 private:
   DirtyRects dirty;
-  uint16_t buffer[MAX_SCREEN_W * HUD_H]{};
+  uint8_t buffer[MAX_SCREEN_W * HUD_H]{};
   int screenW = 0;
   int worldScreenH = 0;
   int lives = 3;

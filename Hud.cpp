@@ -3,34 +3,21 @@
 #include <stdio.h>
 
 #include "Keys.h"
+#include "SGF/BufferSurface.h"
 #include "SGF/Color565.h"
 #include "SGF/Font5x7.h"
 
 namespace {
 
-struct HudDrawContext {
-  uint16_t* buffer = nullptr;
-  int width = 0;
-  int height = 0;
-};
-
-void fillRectOnHud(void* ctx, int x, int y, int w, int h, uint16_t color565) {
-  HudDrawContext* draw = static_cast<HudDrawContext*>(ctx);
-  if (w <= 0 || h <= 0) {
-    return;
-  }
-  for (int yy = y; yy < y + h; yy++) {
-    if (yy < 0 || yy >= draw->height) {
-      continue;
-    }
-    uint16_t* row = &draw->buffer[yy * draw->width];
-    for (int xx = x; xx < x + w; xx++) {
-      if (xx < 0 || xx >= draw->width) {
-        continue;
-      }
-      row[xx] = color565;
-    }
-  }
+uint16_t unpackRgb332(uint8_t packed) {
+  uint8_t r = packed & 0xE0u;
+  uint8_t g = (packed & 0x1Cu) << 3;
+  uint8_t b = (packed & 0x03u) << 6;
+  r |= static_cast<uint8_t>(r >> 3);
+  g |= static_cast<uint8_t>(g >> 3);
+  b |= static_cast<uint8_t>(b >> 2);
+  b |= static_cast<uint8_t>(b >> 4);
+  return Color565::rgb(r, g, b);
 }
 
 }  // namespace
@@ -92,21 +79,8 @@ void Hud::markDirtyRect(int x, int y, int w, int h) {
 }
 
 void Hud::fillRect(int x0, int y0, int w, int h, uint16_t color565) {
-  if (w <= 0 || h <= 0) {
-    return;
-  }
-  for (int y = y0; y < y0 + h; y++) {
-    if (y < 0 || y >= HUD_H) {
-      continue;
-    }
-    uint16_t* row = &buffer[y * screenW];
-    for (int x = x0; x < x0 + w; x++) {
-      if (x < 0 || x >= screenW) {
-        continue;
-      }
-      row[x] = color565;
-    }
-  }
+  BufferSurface332 surface(buffer, screenW, HUD_H, screenW);
+  surface.fillRect565(x0, y0, w, h, color565);
 }
 
 void Hud::drawFace(int x, int y, int w, int h) {
@@ -192,7 +166,7 @@ void Hud::render() {
   const uint16_t accent = Color565::rgb(228, 188, 84);
   const uint16_t green = Color565::rgb(72, 188, 92);
   const uint16_t red = Color565::rgb(196, 72, 58);
-  HudDrawContext ctx{buffer, screenW, HUD_H};
+  BufferSurface332 surface(buffer, screenW, HUD_H, screenW);
   char valueBuf[16];
 
   fillRect(0, 0, screenW, HUD_H, panelBg);
@@ -225,26 +199,18 @@ void Hud::render() {
   fillRect(HUD_STATS_X + HUD_STATS_W - 2, HUD_ENERGY_Y, 2, HUD_ENERGY_H, frame);
   fillRect(HUD_STATS_X, HUD_ENERGY_Y + HUD_ENERGY_H - 2, HUD_STATS_W, 2, frame);
 
-  Font5x7::drawText(HUD_LIVES_X + 6, HUD_LIVES_Y + 4, "LIVES", 1, text, &ctx, fillRectOnHud);
+  Font5x7::drawText(surface, HUD_LIVES_X + 6, HUD_LIVES_Y + 4, "LIVES", 1, text);
   snprintf(valueBuf, sizeof(valueBuf), "%d", lives);
   int livesTextW = Font5x7::textWidth(valueBuf, 2);
-  Font5x7::drawText(
-    HUD_LIVES_X + (HUD_LIVES_W - livesTextW) / 2,
-    HUD_LIVES_Y + 14,
-    valueBuf,
-    2,
-    accent,
-    &ctx,
-    fillRectOnHud);
+  Font5x7::drawText(surface, HUD_LIVES_X + (HUD_LIVES_W - livesTextW) / 2, HUD_LIVES_Y + 14, valueBuf, 2, accent);
 
-  Font5x7::drawText(HUD_STATS_X + 6, HUD_AMMO_Y + 3, "AMMO", 1, text, &ctx, fillRectOnHud);
+  Font5x7::drawText(surface, HUD_STATS_X + 6, HUD_AMMO_Y + 3, "AMMO", 1, text);
   snprintf(valueBuf, sizeof(valueBuf), "%d", ammo);
-  Font5x7::drawText(HUD_STATS_X + 34, HUD_AMMO_Y + 3, valueBuf, 1, accent, &ctx, fillRectOnHud);
+  Font5x7::drawText(surface, HUD_STATS_X + 34, HUD_AMMO_Y + 3, valueBuf, 1, accent);
 
-  Font5x7::drawText(HUD_STATS_X + 6, HUD_ENERGY_Y + 2, "NRG", 1, text, &ctx, fillRectOnHud);
+  Font5x7::drawText(surface, HUD_STATS_X + 6, HUD_ENERGY_Y + 2, "NRG", 1, text);
   snprintf(valueBuf, sizeof(valueBuf), "%d", energy);
-  Font5x7::drawText(
-    HUD_STATS_X + 34, HUD_ENERGY_Y + 2, valueBuf, 1, accent, &ctx, fillRectOnHud);
+  Font5x7::drawText(surface, HUD_STATS_X + 34, HUD_ENERGY_Y + 2, valueBuf, 1, accent);
 
   fillRect(HUD_STATS_X + 6, HUD_ENERGY_Y + 8, 48, 4, numberBg);
   int barW = (48 * energy) / 100;
@@ -283,7 +249,9 @@ void Hud::render() {
   }
 }
 
-void Hud::flush(IRenderTarget& target) {
+void Hud::flush(IPresentTarget& target) {
+  static constexpr int FLUSH_ROWS_PER_BATCH = 2;
+  static uint16_t flushBuf[MAX_SCREEN_W * FLUSH_ROWS_PER_BATCH];
   if (dirty.count() == 0) {
     return;
   }
@@ -292,9 +260,17 @@ void Hud::flush(IRenderTarget& target) {
   for (int i = 0; i < dirty.count(); i++) {
     const Rect& rect = dirty[i];
     int w = rect.x1 - rect.x0 + 1;
-    for (int y = rect.y0; y <= rect.y1; y++) {
-      const uint16_t* row = &buffer[y * screenW + rect.x0];
-      target.blit565(rect.x0, worldScreenH + y, w, 1, row);
+    int h = rect.y1 - rect.y0 + 1;
+    for (int y0 = 0; y0 < h; y0 += FLUSH_ROWS_PER_BATCH) {
+      int batchRows = min(FLUSH_ROWS_PER_BATCH, h - y0);
+      for (int row = 0; row < batchRows; row++) {
+        const uint8_t* src = &buffer[(rect.y0 + y0 + row) * screenW + rect.x0];
+        uint16_t* dst = &flushBuf[row * w];
+        for (int x = 0; x < w; x++) {
+          dst[x] = unpackRgb332(src[x]);
+        }
+      }
+      target.blit565(rect.x0, worldScreenH + rect.y0 + y0, w, batchRows, flushBuf);
     }
   }
   dirty.clear();

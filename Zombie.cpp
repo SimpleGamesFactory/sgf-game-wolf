@@ -8,6 +8,14 @@
 
 namespace {
 
+bool doorIsOpen(const Zombie::WorldView& world, int cellX, int cellY) {
+  if (!world.doorOpenBits) {
+    return false;
+  }
+  int index = cellY * world.mapStride + cellX;
+  return (world.doorOpenBits[index >> 3] & (1u << (index & 7))) != 0;
+}
+
 bool wallAt(const Zombie::WorldView& world, int cellX, int cellY) {
   if (cellX < 0 || cellX >= world.mapWidth || cellY < 0 || cellY >= world.mapHeight) {
     return true;
@@ -17,7 +25,7 @@ bool wallAt(const Zombie::WorldView& world, int cellX, int cellY) {
     return false;
   }
   if (Door::isTile(tile)) {
-    return !world.doorOpen[cellY * world.mapStride + cellX];
+    return !doorIsOpen(world, cellX, cellY);
   }
   return true;
 }

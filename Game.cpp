@@ -11,16 +11,9 @@
 #include "Map.h"
 #include "Minimap.h"
 #include "SGF/Color565.h"
-#include "SGF/Font5x7.h"
 #include "SGF/Math.h"
 
 namespace {
-
-struct FrameDrawContext {
-  uint16_t* buffer = nullptr;
-  int width = 0;
-  int height = 0;
-};
 
 uint16_t applyDamageFlash(uint16_t color565, uint8_t strength) {
   if (strength == 0) {
@@ -85,35 +78,15 @@ uint8_t shotFlashStrength(uint32_t nowMs, uint32_t shotUntilMs, uint32_t duratio
   return static_cast<uint8_t>(strength);
 }
 
-void fillRectOnFrame(void* ctx, int x, int y, int w, int h, uint16_t color565) {
-  FrameDrawContext* draw = static_cast<FrameDrawContext*>(ctx);
-  if (draw == 0 || draw->buffer == 0 || w <= 0 || h <= 0) {
-    return;
-  }
-
-  for (int yy = y; yy < y + h; yy++) {
-    if (yy < 0 || yy >= draw->height) {
-      continue;
-    }
-    uint16_t* row = &draw->buffer[yy * draw->width];
-    for (int xx = x; xx < x + w; xx++) {
-      if (xx < 0 || xx >= draw->width) {
-        continue;
-      }
-      row[xx] = color565;
-    }
-  }
-}
-
 }  // namespace
 
 Wolf3DGame::Wolf3DGame(
-  IRenderTarget& renderTargetRef,
+  IPresentTarget& renderTargetRef,
   IScreen& screenRef,
   const SGFHardware::HardwareProfile& hardwareProfileIn
 )
   : Game(FRAME_DEFAULT_STEP_US, FRAME_MAX_STEP_US),
-    renderTarget(renderTargetRef),
+    presentTarget(renderTargetRef),
     screen(screenRef),
     hardwareProfile(hardwareProfileIn) {
   pinLeft = hardwareProfile.input.left;
@@ -128,8 +101,8 @@ void Wolf3DGame::setup() {
 }
 
 void Wolf3DGame::onSetup() {
-  screenW = renderTarget.width();
-  screenH = renderTarget.height();
+  screenW = presentTarget.width();
+  screenH = presentTarget.height();
   worldScreenH = screenH - HUD_H;
   if (screenW != MAX_SCREEN_W || screenH != MAX_SCREEN_H || worldScreenH != WORLD_H) {
     while (true) {
@@ -170,9 +143,8 @@ void Wolf3DGame::onSetup() {
   hurtUntilMs = 0;
   damageFlashUntilMs = 0;
   nextDamageMs = 0;
-  displayedFps = 0;
-  fpsSampleFrames = 0;
-  fpsSampleStartMs = millis();
+  fpsOverlay.reset();
+  fpsOverlay.update();
 
   hud.begin(screenW, worldScreenH);
   hud.setLives(lives);
@@ -186,7 +158,7 @@ void Wolf3DGame::onSetup() {
   renderFrame();
   presentFrame();
   hud.render();
-  hud.flush(renderTarget);
+  hud.flush(presentTarget);
   resetClock();
 }
 
@@ -204,16 +176,16 @@ void Wolf3DGame::onPhysics(float delta) {
 
 void Wolf3DGame::onProcess(float delta) {
   (void)delta;
-  updateFpsCounter(millis());
+  fpsOverlay.update();
   renderFrame();
   presentFrame();
   hud.render();
-  hud.flush(renderTarget);
+  hud.flush(presentTarget);
   frameCounter++;
 }
 
 void Wolf3DGame::resetMap() {
-  Map::load(map, doorOpen, mapWidth, mapHeight, spawn);
+  Map::load(map, doorOpenBits, mapWidth, mapHeight, spawn);
   Zombie::loadSpawns(zombies, zombieCount, MapLayout::E1M1);
 }
 
@@ -240,7 +212,7 @@ void Wolf3DGame::resetPlayerPose() {
 Zombie::WorldView Wolf3DGame::makeZombieWorldView(uint32_t nowMs, float delta) const {
   Zombie::WorldView world;
   world.map = &map[0][0];
-  world.doorOpen = &doorOpen[0][0];
+  world.doorOpenBits = doorOpenBits;
   world.mapStride = MAP_MAX_W;
   world.mapWidth = mapWidth;
   world.mapHeight = mapHeight;
@@ -258,6 +230,27 @@ bool Wolf3DGame::hasKey(KeyColor color) const {
   return (keysOwned & Keys::bitFor(color)) != 0;
 }
 
+bool Wolf3DGame::isDoorOpen(int cellX, int cellY) const {
+  if (cellX < 0 || cellX >= MAP_MAX_W || cellY < 0 || cellY >= MAP_MAX_H) {
+    return false;
+  }
+  int index = cellY * MAP_MAX_W + cellX;
+  return (doorOpenBits[index >> 3] & (1u << (index & 7))) != 0;
+}
+
+void Wolf3DGame::setDoorOpen(int cellX, int cellY, bool open) {
+  if (cellX < 0 || cellX >= MAP_MAX_W || cellY < 0 || cellY >= MAP_MAX_H) {
+    return;
+  }
+  int index = cellY * MAP_MAX_W + cellX;
+  uint8_t mask = static_cast<uint8_t>(1u << (index & 7));
+  if (open) {
+    doorOpenBits[index >> 3] |= mask;
+  } else {
+    doorOpenBits[index >> 3] &= static_cast<uint8_t>(~mask);
+  }
+}
+
 bool Wolf3DGame::wallAt(int cellX, int cellY) const {
   if (cellX < 0 || cellX >= mapWidth || cellY < 0 || cellY >= mapHeight) {
     return true;
@@ -270,7 +263,7 @@ bool Wolf3DGame::wallAt(int cellX, int cellY) const {
     return false;
   }
   if (Door::isTile(tile)) {
-    return !Door::isPassable(doorOpen[cellY][cellX]);
+    return !Door::isPassable(isDoorOpen(cellX, cellY));
   }
   return true;
 }
@@ -319,9 +312,9 @@ bool Wolf3DGame::toggleDoorAhead() {
     return false;
   }
 
-  if (doorOpen[cellY][cellX]) {
+  if (isDoorOpen(cellX, cellY)) {
     if (canCloseDoor(cellX, cellY)) {
-      doorOpen[cellY][cellX] = false;
+      setDoorOpen(cellX, cellY, false);
     }
   } else {
     KeyColor required = Door::requiredKey(map[cellY][cellX]);
@@ -333,7 +326,7 @@ bool Wolf3DGame::toggleDoorAhead() {
       hud.setKeys(keysOwned);
       map[cellY][cellX] = 'D';
     }
-    doorOpen[cellY][cellX] = true;
+    setDoorOpen(cellX, cellY, true);
   }
   return true;
 }
@@ -506,22 +499,6 @@ void Wolf3DGame::updateHudAnimation() {
   hud.setFaceMood(currentFaceMood(nowMs));
 }
 
-void Wolf3DGame::updateFpsCounter(uint32_t nowMs) {
-  if (fpsSampleStartMs == 0) {
-    fpsSampleStartMs = nowMs;
-  }
-
-  fpsSampleFrames++;
-  uint32_t elapsedMs = nowMs - fpsSampleStartMs;
-  if (elapsedMs < 250u) {
-    return;
-  }
-
-  displayedFps = static_cast<uint16_t>((fpsSampleFrames * 1000u + (elapsedMs / 2u)) / elapsedMs);
-  fpsSampleFrames = 0;
-  fpsSampleStartMs = nowMs;
-}
-
 void Wolf3DGame::renderFrame() {
   clearFrame();
   renderFloor();
@@ -535,7 +512,7 @@ void Wolf3DGame::renderFrame() {
       RENDER_W,
       RENDER_H,
       &map[0][0],
-      &doorOpen[0][0],
+      doorOpenBits,
       MAP_MAX_W,
       mapWidth,
       mapHeight,
@@ -544,41 +521,47 @@ void Wolf3DGame::renderFrame() {
       dirX,
       dirY);
   }
-  renderFpsCounter();
 }
 
 void Wolf3DGame::presentFrame() {
   uint32_t nowMs = millis();
   uint8_t hitFlashStrength = damageFlashStrength(nowMs, damageFlashUntilMs, DAMAGE_FLASH_MS);
   uint8_t muzzleFlashStrength = shotFlashStrength(nowMs, shotUntilMs, WEAPON_FLASH_MS);
-  for (int y = 0; y < RENDER_H; y++) {
-    const uint16_t* src = &frameBuffer[y * RENDER_W];
-    if (hitFlashStrength == 0 && muzzleFlashStrength == 0) {
-      for (int x = 0; x < RENDER_W; x++) {
-        uint16_t color565 = src[x];
-        int dstX = x * UPSCALE;
-        upscaleBuffer[dstX] = color565;
-        upscaleBuffer[dstX + 1] = color565;
-        upscaleBuffer[screenW + dstX] = color565;
-        upscaleBuffer[screenW + dstX + 1] = color565;
-      }
-    } else {
-      for (int x = 0; x < RENDER_W; x++) {
-        uint16_t color565 = src[x];
-        if (muzzleFlashStrength > 0) {
-          color565 = applyShotFlash(color565, muzzleFlashStrength);
+  for (int srcY0 = 0; srcY0 < RENDER_H; srcY0 += UPSCALE_CHUNK_SRC_ROWS) {
+    int srcRows = Math::clamp(UPSCALE_CHUNK_SRC_ROWS, 1, RENDER_H - srcY0);
+    int dstRows = srcRows * UPSCALE;
+    for (int localY = 0; localY < srcRows; localY++) {
+      const uint16_t* src = &frameBuffer[(srcY0 + localY) * RENDER_W];
+      uint16_t* dstRow0 = &upscaleBuffer[(localY * UPSCALE) * screenW];
+      uint16_t* dstRow1 = dstRow0 + screenW;
+      if (hitFlashStrength == 0 && muzzleFlashStrength == 0) {
+        for (int x = 0; x < RENDER_W; x++) {
+          uint16_t color565 = src[x];
+          int dstX = x * UPSCALE;
+          dstRow0[dstX] = color565;
+          dstRow0[dstX + 1] = color565;
+          dstRow1[dstX] = color565;
+          dstRow1[dstX + 1] = color565;
         }
-        if (hitFlashStrength > 0) {
-          color565 = applyDamageFlash(color565, hitFlashStrength);
+      } else {
+        for (int x = 0; x < RENDER_W; x++) {
+          uint16_t color565 = src[x];
+          if (muzzleFlashStrength > 0) {
+            color565 = applyShotFlash(color565, muzzleFlashStrength);
+          }
+          if (hitFlashStrength > 0) {
+            color565 = applyDamageFlash(color565, hitFlashStrength);
+          }
+          int dstX = x * UPSCALE;
+          dstRow0[dstX] = color565;
+          dstRow0[dstX + 1] = color565;
+          dstRow1[dstX] = color565;
+          dstRow1[dstX + 1] = color565;
         }
-        int dstX = x * UPSCALE;
-        upscaleBuffer[dstX] = color565;
-        upscaleBuffer[dstX + 1] = color565;
-        upscaleBuffer[screenW + dstX] = color565;
-        upscaleBuffer[screenW + dstX + 1] = color565;
       }
     }
-    renderTarget.blit565(0, y * UPSCALE, screenW, UPSCALE, upscaleBuffer);
+    fpsOverlay.renderRegion(screenW, 0, srcY0 * UPSCALE, screenW, dstRows, upscaleBuffer, screenW);
+    presentTarget.blit565(0, srcY0 * UPSCALE, screenW, dstRows, upscaleBuffer);
   }
 }
 
@@ -720,32 +703,6 @@ void Wolf3DGame::renderWorld() {
     wallDepth[x] = perpWallDist;
     renderColumn(x, drawStart, drawEnd, tile, texX, perpWallDist, side);
   }
-}
-
-void Wolf3DGame::renderFpsCounter() {
-  char fpsText[12];
-  snprintf(fpsText, sizeof(fpsText), "%u FPS", static_cast<unsigned>(displayedFps));
-
-  FrameDrawContext ctx{frameBuffer, RENDER_W, RENDER_H};
-  const int textScale = 1;
-  const int textW = Font5x7::textWidth(fpsText, textScale);
-  const int textH = 7 * textScale;
-  const int paddingX = 3;
-  const int paddingY = 2;
-  const int boxW = textW + paddingX * 2;
-  const int boxH = textH + paddingY * 2;
-  const int boxX = RENDER_W - boxW - 2;
-  const int boxY = 2;
-  const uint16_t bg = Color565::rgb(8, 10, 14);
-  const uint16_t border = Color565::rgb(60, 76, 92);
-  const uint16_t text = Color565::rgb(236, 220, 180);
-
-  fillRect(boxX, boxY, boxW, boxH, bg);
-  fillRect(boxX, boxY, boxW, 1, border);
-  fillRect(boxX, boxY + boxH - 1, boxW, 1, border);
-  fillRect(boxX, boxY, 1, boxH, border);
-  fillRect(boxX + boxW - 1, boxY, 1, boxH, border);
-  Font5x7::drawText(boxX + paddingX, boxY + paddingY, fpsText, textScale, text, &ctx, fillRectOnFrame);
 }
 
 void Wolf3DGame::renderKeys() {

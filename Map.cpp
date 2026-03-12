@@ -4,7 +4,7 @@
 
 void Map::load(
   uint8_t (&tiles)[MAX_HEIGHT][MAX_WIDTH],
-  bool (&doorOpen)[MAX_HEIGHT][MAX_WIDTH],
+  uint8_t (&doorOpenBits)[DOOR_OPEN_BYTES],
   int& width,
   int& height,
   Spawn& spawn
@@ -13,10 +13,12 @@ void Map::load(
   width = WIDTH;
   height = HEIGHT;
 
+  for (int i = 0; i < DOOR_OPEN_BYTES; i++) {
+    doorOpenBits[i] = 0;
+  }
   for (int y = 0; y < MAX_HEIGHT; y++) {
     for (int x = 0; x < MAX_WIDTH; x++) {
       tiles[y][x] = 0;
-      doorOpen[y][x] = false;
     }
   }
 

@@ -60,6 +60,8 @@ class Map {
 public:
   static constexpr int MAX_WIDTH = 64;
   static constexpr int MAX_HEIGHT = 64;
+  static constexpr int CELL_COUNT = MAX_WIDTH * MAX_HEIGHT;
+  static constexpr int DOOR_OPEN_BYTES = (CELL_COUNT + 7) / 8;
   static constexpr int WIDTH = MapLayout::computeWidth(MapLayout::E1M1);
   static constexpr int HEIGHT = MapLayout::computeHeight(MapLayout::E1M1);
   static_assert(WIDTH > 0, "Map width must be greater than zero");
@@ -76,7 +78,7 @@ public:
 
   static void load(
     uint8_t (&tiles)[MAX_HEIGHT][MAX_WIDTH],
-    bool (&doorOpen)[MAX_HEIGHT][MAX_WIDTH],
+    uint8_t (&doorOpenBits)[DOOR_OPEN_BYTES],
     int& width,
     int& height,
     Spawn& spawn);

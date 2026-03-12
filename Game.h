@@ -3,10 +3,11 @@
 #include <stdint.h>
 
 #include "SGF/Actions.h"
+#include "SGF/FpsOverlay.h"
 #include "SGF/Game.h"
 #include "SGF/HardwareProfile.h"
 #include "SGF/InputPin.h"
-#include "SGF/IRenderTarget.h"
+#include "SGF/IPresentTarget.h"
 #include "SGF/IScreen.h"
 #include "Hud.h"
 #include "Keys.h"
@@ -16,7 +17,7 @@
 class Wolf3DGame : public Game {
 public:
   Wolf3DGame(
-    IRenderTarget& renderTarget,
+    IPresentTarget& renderTarget,
     IScreen& screen,
     const SGFHardware::HardwareProfile& hardwareProfile
   );
@@ -31,6 +32,7 @@ private:
   static constexpr int HUD_H = 40;
   static constexpr int WORLD_H = MAX_SCREEN_H - HUD_H;
   static constexpr int UPSCALE = 2;
+  static constexpr int UPSCALE_CHUNK_SRC_ROWS = 3;
   static constexpr int RENDER_W = MAX_SCREEN_W / UPSCALE;
   static constexpr int RENDER_H = WORLD_H / UPSCALE;
   static constexpr int TEX_SIZE = 16;
@@ -68,7 +70,7 @@ private:
   static constexpr int HUD_ENERGY_H = 14;
   static constexpr int HUD_STATS_W = 60;
 
-  IRenderTarget& renderTarget;
+  IPresentTarget& presentTarget;
   IScreen& screen;
   SGFHardware::HardwareProfile hardwareProfile;
   int screenW = 0;
@@ -80,6 +82,7 @@ private:
   uint8_t pinUp = 0;
   uint8_t pinDown = 0;
   uint8_t pinFire = 0;
+  FpsOverlay fpsOverlay;
 
   DebouncedInputPin leftPinInput;
   DebouncedInputPin rightPinInput;
@@ -93,7 +96,7 @@ private:
   DigitalAction fireAction;
 
   uint16_t frameBuffer[RENDER_W * RENDER_H]{};
-  uint16_t upscaleBuffer[MAX_SCREEN_W * UPSCALE]{};
+  uint16_t upscaleBuffer[MAX_SCREEN_W * UPSCALE * UPSCALE_CHUNK_SRC_ROWS]{};
   float wallDepth[RENDER_W]{};
 
   float playerX = 3.5f;
@@ -103,9 +106,6 @@ private:
   float planeX = 0.0f;
   float planeY = CAMERA_PLANE_SCALE;
   uint32_t frameCounter = 0;
-  uint16_t displayedFps = 0;
-  uint16_t fpsSampleFrames = 0;
-  uint32_t fpsSampleStartMs = 0;
   int ammo = START_AMMO;
   int lives = START_LIVES;
   int energy = START_ENERGY;
@@ -120,7 +120,7 @@ private:
   uint32_t nextDamageMs = 0;
   Hud hud;
   uint8_t map[MAP_MAX_H][MAP_MAX_W]{};
-  bool doorOpen[MAP_MAX_H][MAP_MAX_W]{};
+  uint8_t doorOpenBits[Map::DOOR_OPEN_BYTES]{};
   int mapWidth = 0;
   int mapHeight = 0;
   Map::Spawn spawn;
@@ -135,6 +135,8 @@ private:
   void resetPlayerPose();
   Zombie::WorldView makeZombieWorldView(uint32_t nowMs, float delta) const;
   bool hasKey(KeyColor color) const;
+  bool isDoorOpen(int cellX, int cellY) const;
+  void setDoorOpen(int cellX, int cellY, bool open);
   bool wallAt(int cellX, int cellY) const;
   bool attemptMove(float nextX, float nextY);
   void onBlockedMove();
@@ -147,14 +149,12 @@ private:
   void updateInput(float delta);
   void updateZombies(float delta);
   void updateHudAnimation();
-  void updateFpsCounter(uint32_t nowMs);
   Hud::FaceMood currentFaceMood(uint32_t nowMs) const;
 
   void renderFrame();
   void presentFrame();
   void clearFrame();
   void renderFloor();
-  void renderFpsCounter();
   void renderKeys();
   void renderWorld();
   void renderZombies(uint32_t nowMs);

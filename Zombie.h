@@ -10,7 +10,7 @@ public:
 
   struct WorldView {
     const uint8_t* map = nullptr;
-    const bool* doorOpen = nullptr;
+    const uint8_t* doorOpenBits = nullptr;
     int mapStride = 0;
     int mapWidth = 0;
     int mapHeight = 0;
