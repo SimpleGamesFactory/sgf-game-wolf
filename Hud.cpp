@@ -3,11 +3,49 @@
 #include <stdio.h>
 
 #include "Keys.h"
-#include "SGF/BufferSurface.h"
 #include "SGF/Color565.h"
 #include "SGF/Font5x7.h"
+#include "SGF/FontRenderer.h"
+#include "SGF/IFillRect.h"
 
 namespace {
+
+class HudBufferFillRect : public IFillRect {
+public:
+  HudBufferFillRect(uint8_t* pixelsRef, int widthRef, int heightRef)
+    : pixels(pixelsRef), width(widthRef), height(heightRef) {}
+
+  void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override {
+    if (w <= 0 || h <= 0) {
+      return;
+    }
+    uint8_t packed = packRgb332(color565);
+    for (int yy = y0; yy < y0 + h; yy++) {
+      if (yy < 0 || yy >= height) {
+        continue;
+      }
+      uint8_t* row = &pixels[yy * width];
+      for (int xx = x0; xx < x0 + w; xx++) {
+        if (xx < 0 || xx >= width) {
+          continue;
+        }
+        row[xx] = packed;
+      }
+    }
+  }
+
+private:
+  static uint8_t packRgb332(uint16_t color565) {
+    uint8_t r = static_cast<uint8_t>(((color565 >> 11) & 0x1Fu) * 255u / 31u);
+    uint8_t g = static_cast<uint8_t>(((color565 >> 5) & 0x3Fu) * 255u / 63u);
+    uint8_t b = static_cast<uint8_t>((color565 & 0x1Fu) * 255u / 31u);
+    return static_cast<uint8_t>((r & 0xE0u) | ((g >> 3) & 0x1Cu) | (b >> 6));
+  }
+
+  uint8_t* pixels = nullptr;
+  int width = 0;
+  int height = 0;
+};
 
 uint16_t unpackRgb332(uint8_t packed) {
   uint8_t r = packed & 0xE0u;
@@ -79,8 +117,8 @@ void Hud::markDirtyRect(int x, int y, int w, int h) {
 }
 
 void Hud::fillRect(int x0, int y0, int w, int h, uint16_t color565) {
-  BufferSurface332 surface(buffer, screenW, HUD_H, screenW);
-  surface.fillRect565(x0, y0, w, h, color565);
+  HudBufferFillRect fillRect(buffer, screenW, HUD_H);
+  fillRect.fillRect565(x0, y0, w, h, color565);
 }
 
 void Hud::drawFace(int x, int y, int w, int h) {
@@ -166,7 +204,7 @@ void Hud::render() {
   const uint16_t accent = Color565::rgb(228, 188, 84);
   const uint16_t green = Color565::rgb(72, 188, 92);
   const uint16_t red = Color565::rgb(196, 72, 58);
-  BufferSurface332 surface(buffer, screenW, HUD_H, screenW);
+  HudBufferFillRect fillRectTarget(buffer, screenW, HUD_H);
   char valueBuf[16];
 
   fillRect(0, 0, screenW, HUD_H, panelBg);
@@ -199,18 +237,25 @@ void Hud::render() {
   fillRect(HUD_STATS_X + HUD_STATS_W - 2, HUD_ENERGY_Y, 2, HUD_ENERGY_H, frame);
   fillRect(HUD_STATS_X, HUD_ENERGY_Y + HUD_ENERGY_H - 2, HUD_STATS_W, 2, frame);
 
-  Font5x7::drawText(surface, HUD_LIVES_X + 6, HUD_LIVES_Y + 4, "LIVES", 1, text);
+  FontRenderer::drawText(FONT_5X7, fillRectTarget, HUD_LIVES_X + 6, HUD_LIVES_Y + 4, "LIVES", 1, text);
   snprintf(valueBuf, sizeof(valueBuf), "%d", lives);
-  int livesTextW = Font5x7::textWidth(valueBuf, 2);
-  Font5x7::drawText(surface, HUD_LIVES_X + (HUD_LIVES_W - livesTextW) / 2, HUD_LIVES_Y + 14, valueBuf, 2, accent);
+  int livesTextW = FontRenderer::textWidth(FONT_5X7, valueBuf, 2);
+  FontRenderer::drawText(
+    FONT_5X7,
+    fillRectTarget,
+    HUD_LIVES_X + (HUD_LIVES_W - livesTextW) / 2,
+    HUD_LIVES_Y + 14,
+    valueBuf,
+    2,
+    accent);
 
-  Font5x7::drawText(surface, HUD_STATS_X + 6, HUD_AMMO_Y + 3, "AMMO", 1, text);
+  FontRenderer::drawText(FONT_5X7, fillRectTarget, HUD_STATS_X + 6, HUD_AMMO_Y + 3, "AMMO", 1, text);
   snprintf(valueBuf, sizeof(valueBuf), "%d", ammo);
-  Font5x7::drawText(surface, HUD_STATS_X + 34, HUD_AMMO_Y + 3, valueBuf, 1, accent);
+  FontRenderer::drawText(FONT_5X7, fillRectTarget, HUD_STATS_X + 34, HUD_AMMO_Y + 3, valueBuf, 1, accent);
 
-  Font5x7::drawText(surface, HUD_STATS_X + 6, HUD_ENERGY_Y + 2, "NRG", 1, text);
+  FontRenderer::drawText(FONT_5X7, fillRectTarget, HUD_STATS_X + 6, HUD_ENERGY_Y + 2, "NRG", 1, text);
   snprintf(valueBuf, sizeof(valueBuf), "%d", energy);
-  Font5x7::drawText(surface, HUD_STATS_X + 34, HUD_ENERGY_Y + 2, valueBuf, 1, accent);
+  FontRenderer::drawText(FONT_5X7, fillRectTarget, HUD_STATS_X + 34, HUD_ENERGY_Y + 2, valueBuf, 1, accent);
 
   fillRect(HUD_STATS_X + 6, HUD_ENERGY_Y + 8, 48, 4, numberBg);
   int barW = (48 * energy) / 100;
@@ -249,7 +294,7 @@ void Hud::render() {
   }
 }
 
-void Hud::flush(IPresentTarget& target) {
+void Hud::flush(IRenderTarget& target) {
   static constexpr int FLUSH_ROWS_PER_BATCH = 2;
   static uint16_t flushBuf[MAX_SCREEN_W * FLUSH_ROWS_PER_BATCH];
   if (dirty.count() == 0) {

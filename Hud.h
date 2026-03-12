@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "SGF/DirtyRects.h"
-#include "SGF/IPresentTarget.h"
+#include "SGF/IRenderTarget.h"
 
 class Hud {
 public:
@@ -40,7 +40,7 @@ public:
   void setFaceMood(FaceMood value);
   void invalidate();
   void render();
-  void flush(IPresentTarget& target);
+  void flush(IRenderTarget& target);
 
 private:
   DirtyRects dirty;

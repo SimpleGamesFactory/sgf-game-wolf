@@ -11,9 +11,41 @@
 #include "Map.h"
 #include "Minimap.h"
 #include "SGF/Color565.h"
+#include "SGF/FontRenderer.h"
+#include "SGF/IFillRect.h"
 #include "SGF/Math.h"
 
 namespace {
+
+class FrameBufferFillRect : public IFillRect {
+public:
+  FrameBufferFillRect(uint16_t* pixelsRef, int widthRef, int heightRef)
+    : pixels(pixelsRef), width(widthRef), height(heightRef) {}
+
+  void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override {
+    if (pixels == 0 || w <= 0 || h <= 0) {
+      return;
+    }
+
+    for (int yy = y0; yy < y0 + h; yy++) {
+      if (yy < 0 || yy >= height) {
+        continue;
+      }
+      uint16_t* row = &pixels[yy * width];
+      for (int xx = x0; xx < x0 + w; xx++) {
+        if (xx < 0 || xx >= width) {
+          continue;
+        }
+        row[xx] = color565;
+      }
+    }
+  }
+
+private:
+  uint16_t* pixels = nullptr;
+  int width = 0;
+  int height = 0;
+};
 
 uint16_t applyDamageFlash(uint16_t color565, uint8_t strength) {
   if (strength == 0) {
@@ -81,12 +113,12 @@ uint8_t shotFlashStrength(uint32_t nowMs, uint32_t shotUntilMs, uint32_t duratio
 }  // namespace
 
 Wolf3DGame::Wolf3DGame(
-  IPresentTarget& renderTargetRef,
+  IRenderTarget& renderTargetRef,
   IScreen& screenRef,
   const SGFHardware::HardwareProfile& hardwareProfileIn
 )
   : Game(FRAME_DEFAULT_STEP_US, FRAME_MAX_STEP_US),
-    presentTarget(renderTargetRef),
+    renderTarget(renderTargetRef),
     screen(screenRef),
     hardwareProfile(hardwareProfileIn) {
   pinLeft = hardwareProfile.input.left;
@@ -101,8 +133,9 @@ void Wolf3DGame::setup() {
 }
 
 void Wolf3DGame::onSetup() {
-  screenW = presentTarget.width();
-  screenH = presentTarget.height();
+  Vector2i targetSize = renderTarget.size();
+  screenW = targetSize.x;
+  screenH = targetSize.y;
   worldScreenH = screenH - HUD_H;
   if (screenW != MAX_SCREEN_W || screenH != MAX_SCREEN_H || worldScreenH != WORLD_H) {
     while (true) {
@@ -115,21 +148,11 @@ void Wolf3DGame::onSetup() {
   upPinInput.attach(pinUp, true);
   downPinInput.attach(pinDown, true);
   firePinInput.attach(pinFire, true);
-  leftPinInput.begin(INPUT_PULLUP);
-  rightPinInput.begin(INPUT_PULLUP);
-  upPinInput.begin(INPUT_PULLUP);
-  downPinInput.begin(INPUT_PULLUP);
-  firePinInput.begin(INPUT_PULLUP);
-  leftPinInput.resetFromPin();
-  rightPinInput.resetFromPin();
-  upPinInput.resetFromPin();
-  downPinInput.resetFromPin();
-  firePinInput.resetFromPin();
-  leftAction.reset(leftPinInput.pressed());
-  rightAction.reset(rightPinInput.pressed());
-  upAction.reset(upPinInput.pressed());
-  downAction.reset(downPinInput.pressed());
-  fireAction.reset(firePinInput.pressed());
+  leftAction.sync(leftPinInput.isActive());
+  rightAction.sync(rightPinInput.isActive());
+  upAction.sync(upPinInput.isActive());
+  downAction.sync(downPinInput.isActive());
+  fireAction.sync(firePinInput.isActive());
 
   ammo = START_AMMO;
   lives = START_LIVES;
@@ -143,8 +166,9 @@ void Wolf3DGame::onSetup() {
   hurtUntilMs = 0;
   damageFlashUntilMs = 0;
   nextDamageMs = 0;
-  fpsOverlay.reset();
-  fpsOverlay.update();
+  displayedFps = 0;
+  fpsSampleFrames = 0;
+  fpsSampleStartMs = millis();
 
   hud.begin(screenW, worldScreenH);
   hud.setLives(lives);
@@ -158,16 +182,20 @@ void Wolf3DGame::onSetup() {
   renderFrame();
   presentFrame();
   hud.render();
-  hud.flush(presentTarget);
-  resetClock();
+  hud.flush(renderTarget);
 }
 
 void Wolf3DGame::onPhysics(float delta) {
-  leftAction.update(leftPinInput.update());
-  rightAction.update(rightPinInput.update());
-  upAction.update(upPinInput.update());
-  downAction.update(downPinInput.update());
-  fireAction.update(firePinInput.update());
+  leftPinInput.update();
+  rightPinInput.update();
+  upPinInput.update();
+  downPinInput.update();
+  firePinInput.update();
+  leftAction.update(leftPinInput.isActive());
+  rightAction.update(rightPinInput.isActive());
+  upAction.update(upPinInput.isActive());
+  downAction.update(downPinInput.isActive());
+  fireAction.update(firePinInput.isActive());
 
   updateInput(delta);
   updateZombies(delta);
@@ -176,11 +204,11 @@ void Wolf3DGame::onPhysics(float delta) {
 
 void Wolf3DGame::onProcess(float delta) {
   (void)delta;
-  fpsOverlay.update();
+  updateFpsCounter(millis());
   renderFrame();
   presentFrame();
   hud.render();
-  hud.flush(presentTarget);
+  hud.flush(renderTarget);
   frameCounter++;
 }
 
@@ -411,13 +439,13 @@ void Wolf3DGame::applyDamage(int amount) {
 }
 
 void Wolf3DGame::updateInput(float delta) {
-  bool minimapShortcut = fireAction.pressed() && upAction.pressed();
+  bool minimapShortcut = fireAction.isPressed() && upAction.isPressed();
   if (minimapShortcut && !minimapShortcutHeld) {
     showMinimap = !showMinimap;
   }
   minimapShortcutHeld = minimapShortcut;
 
-  if (fireAction.justPressed()) {
+  if (fireAction.isJustPressed()) {
     if (!toggleDoorAhead()) {
       shoot();
     }
@@ -427,35 +455,35 @@ void Wolf3DGame::updateInput(float delta) {
   float strafeStep = STRAFE_SPEED * delta;
   float turnStep = TURN_SPEED * delta;
 
-  if (upAction.pressed() && !fireAction.pressed()) {
+  if (upAction.isPressed() && !fireAction.isPressed()) {
     if (!attemptMove(playerX + dirX * moveStep, playerY + dirY * moveStep)) {
       onBlockedMove();
     }
   }
-  if (downAction.pressed()) {
+  if (downAction.isPressed()) {
     if (!attemptMove(playerX - dirX * moveStep, playerY - dirY * moveStep)) {
       onBlockedMove();
     }
   }
 
-  if (fireAction.pressed()) {
+  if (fireAction.isPressed()) {
     float sideX = -dirY;
     float sideY = dirX;
-    if (leftAction.pressed()) {
+    if (leftAction.isPressed()) {
       if (!attemptMove(playerX - sideX * strafeStep, playerY - sideY * strafeStep)) {
         onBlockedMove();
       }
     }
-    if (rightAction.pressed()) {
+    if (rightAction.isPressed()) {
       if (!attemptMove(playerX + sideX * strafeStep, playerY + sideY * strafeStep)) {
         onBlockedMove();
       }
     }
   } else {
-    if (leftAction.pressed()) {
+    if (leftAction.isPressed()) {
       rotate(-turnStep);
     }
-    if (rightAction.pressed()) {
+    if (rightAction.isPressed()) {
       rotate(turnStep);
     }
   }
@@ -499,6 +527,22 @@ void Wolf3DGame::updateHudAnimation() {
   hud.setFaceMood(currentFaceMood(nowMs));
 }
 
+void Wolf3DGame::updateFpsCounter(uint32_t nowMs) {
+  if (fpsSampleStartMs == 0) {
+    fpsSampleStartMs = nowMs;
+  }
+
+  fpsSampleFrames++;
+  uint32_t elapsedMs = nowMs - fpsSampleStartMs;
+  if (elapsedMs < 250u) {
+    return;
+  }
+
+  displayedFps = static_cast<uint16_t>((fpsSampleFrames * 1000u + (elapsedMs / 2u)) / elapsedMs);
+  fpsSampleFrames = 0;
+  fpsSampleStartMs = nowMs;
+}
+
 void Wolf3DGame::renderFrame() {
   clearFrame();
   renderFloor();
@@ -521,6 +565,7 @@ void Wolf3DGame::renderFrame() {
       dirX,
       dirY);
   }
+  renderFpsCounter();
 }
 
 void Wolf3DGame::presentFrame() {
@@ -560,8 +605,7 @@ void Wolf3DGame::presentFrame() {
         }
       }
     }
-    fpsOverlay.renderRegion(screenW, 0, srcY0 * UPSCALE, screenW, dstRows, upscaleBuffer, screenW);
-    presentTarget.blit565(0, srcY0 * UPSCALE, screenW, dstRows, upscaleBuffer);
+    renderTarget.blit565(0, srcY0 * UPSCALE, screenW, dstRows, upscaleBuffer);
   }
 }
 
@@ -703,6 +747,32 @@ void Wolf3DGame::renderWorld() {
     wallDepth[x] = perpWallDist;
     renderColumn(x, drawStart, drawEnd, tile, texX, perpWallDist, side);
   }
+}
+
+void Wolf3DGame::renderFpsCounter() {
+  char fpsText[12];
+  snprintf(fpsText, sizeof(fpsText), "%u FPS", static_cast<unsigned>(displayedFps));
+
+  FrameBufferFillRect fillRect(frameBuffer, RENDER_W, RENDER_H);
+  const int textScale = 1;
+  const int textW = FontRenderer::textWidth(FONT_5X7, fpsText, textScale);
+  const int textH = FONT_5X7.glyphHeight() * textScale;
+  const int paddingX = 3;
+  const int paddingY = 2;
+  const int boxW = textW + paddingX * 2;
+  const int boxH = textH + paddingY * 2;
+  const int boxX = RENDER_W - boxW - 2;
+  const int boxY = 2;
+  const uint16_t bg = Color565::rgb(8, 10, 14);
+  const uint16_t border = Color565::rgb(60, 76, 92);
+  const uint16_t text = Color565::rgb(236, 220, 180);
+
+  fillRect.fillRect565(boxX, boxY, boxW, boxH, bg);
+  fillRect.fillRect565(boxX, boxY, boxW, 1, border);
+  fillRect.fillRect565(boxX, boxY + boxH - 1, boxW, 1, border);
+  fillRect.fillRect565(boxX, boxY, 1, boxH, border);
+  fillRect.fillRect565(boxX + boxW - 1, boxY, 1, boxH, border);
+  FontRenderer::drawText(FONT_5X7, fillRect, boxX + paddingX, boxY + paddingY, fpsText, textScale, text);
 }
 
 void Wolf3DGame::renderKeys() {

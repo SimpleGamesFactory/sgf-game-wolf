@@ -2,12 +2,13 @@
 
 #include <stdint.h>
 
-#include "SGF/Actions.h"
-#include "SGF/FpsOverlay.h"
+#include "SGF/ActionState.h"
+#include "SGF/IFillRect.h"
+#include "SGF/Font5x7.h"
 #include "SGF/Game.h"
 #include "SGF/HardwareProfile.h"
-#include "SGF/InputPin.h"
-#include "SGF/IPresentTarget.h"
+#include "SGF/DebouncedInputPin.h"
+#include "SGF/IRenderTarget.h"
 #include "SGF/IScreen.h"
 #include "Hud.h"
 #include "Keys.h"
@@ -17,7 +18,7 @@
 class Wolf3DGame : public Game {
 public:
   Wolf3DGame(
-    IPresentTarget& renderTarget,
+    IRenderTarget& renderTarget,
     IScreen& screen,
     const SGFHardware::HardwareProfile& hardwareProfile
   );
@@ -70,7 +71,7 @@ private:
   static constexpr int HUD_ENERGY_H = 14;
   static constexpr int HUD_STATS_W = 60;
 
-  IPresentTarget& presentTarget;
+  IRenderTarget& renderTarget;
   IScreen& screen;
   SGFHardware::HardwareProfile hardwareProfile;
   int screenW = 0;
@@ -82,18 +83,16 @@ private:
   uint8_t pinUp = 0;
   uint8_t pinDown = 0;
   uint8_t pinFire = 0;
-  FpsOverlay fpsOverlay;
-
   DebouncedInputPin leftPinInput;
   DebouncedInputPin rightPinInput;
   DebouncedInputPin upPinInput;
   DebouncedInputPin downPinInput;
   DebouncedInputPin firePinInput;
-  DigitalAction leftAction;
-  DigitalAction rightAction;
-  DigitalAction upAction;
-  DigitalAction downAction;
-  DigitalAction fireAction;
+  ActionState leftAction;
+  ActionState rightAction;
+  ActionState upAction;
+  ActionState downAction;
+  ActionState fireAction;
 
   uint16_t frameBuffer[RENDER_W * RENDER_H]{};
   uint16_t upscaleBuffer[MAX_SCREEN_W * UPSCALE * UPSCALE_CHUNK_SRC_ROWS]{};
@@ -106,6 +105,9 @@ private:
   float planeX = 0.0f;
   float planeY = CAMERA_PLANE_SCALE;
   uint32_t frameCounter = 0;
+  uint16_t displayedFps = 0;
+  uint16_t fpsSampleFrames = 0;
+  uint32_t fpsSampleStartMs = 0;
   int ammo = START_AMMO;
   int lives = START_LIVES;
   int energy = START_ENERGY;
@@ -149,12 +151,14 @@ private:
   void updateInput(float delta);
   void updateZombies(float delta);
   void updateHudAnimation();
+  void updateFpsCounter(uint32_t nowMs);
   Hud::FaceMood currentFaceMood(uint32_t nowMs) const;
 
   void renderFrame();
   void presentFrame();
   void clearFrame();
   void renderFloor();
+  void renderFpsCounter();
   void renderKeys();
   void renderWorld();
   void renderZombies(uint32_t nowMs);
