@@ -13,6 +13,7 @@
 #include "Hud.h"
 #include "Keys.h"
 #include "Map.h"
+#include "WolfProfiler.h"
 #include "Zombie.h"
 
 class Wolf3DGame : public Game {
@@ -120,6 +121,7 @@ private:
   uint32_t shotUntilMs = 0;
   uint32_t hurtUntilMs = 0;
   uint32_t nextDamageMs = 0;
+  WolfProfiler profiler;
   Hud hud;
   uint8_t map[MAP_MAX_H][MAP_MAX_W]{};
   uint8_t doorOpenBits[Map::DOOR_OPEN_BYTES]{};
