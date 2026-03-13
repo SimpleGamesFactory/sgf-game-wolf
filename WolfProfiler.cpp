@@ -47,10 +47,8 @@ const char* WolfProfiler::slotLabel(Slot slot) {
       return "floor";
     case Slot::World:
       return "world";
-    case Slot::Keys:
-      return "keys";
-    case Slot::ZombieRender:
-      return "zrend";
+    case Slot::Sprites:
+      return "sprites";
     case Slot::Weapon:
       return "weapon";
     case Slot::Minimap:

@@ -1,5 +1,7 @@
 #include "Keys.h"
 
+#include <string.h>
+
 #include "SGF/Color565.h"
 
 namespace Keys {
@@ -84,6 +86,17 @@ const uint16_t* textureForColor(KeyColor color) {
   return textures[idx];
 }
 
+void buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_t nowMs) {
+  (void)nowMs;
+  const uint8_t tile = static_cast<uint8_t>(reinterpret_cast<uintptr_t>(owner));
+  const uint16_t* tex = texture(tile);
+  if (tex == nullptr) {
+    memset(outTexture, 0, TEX_SIZE * TEX_SIZE * sizeof(uint16_t));
+    return;
+  }
+  memcpy(outTexture, tex, TEX_SIZE * TEX_SIZE * sizeof(uint16_t));
+}
+
 }  // namespace
 
 bool isPickup(uint8_t tile) {
@@ -131,6 +144,19 @@ uint16_t texel(uint8_t tile, int texX, int texY) {
 
 const uint16_t* texture(uint8_t tile) {
   return textureForColor(colorForPickup(tile));
+}
+
+void initSprite(WolfRender::Sprite& sprite, uint8_t tile, float x, float y) {
+  sprite.configure(
+    x,
+    y,
+    TEX_SIZE,
+    1,
+    1,
+    3,
+    8.0f,
+    reinterpret_cast<const void*>(static_cast<uintptr_t>(tile)),
+    buildSpriteTexture);
 }
 
 }  // namespace Keys

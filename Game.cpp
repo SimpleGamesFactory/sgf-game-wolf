@@ -605,14 +605,10 @@ void Wolf3DGame::renderFrame() {
   renderWorld();
   profiler.add(WolfProfiler::Slot::World, micros() - sectionStartUs);
 
-  sectionStartUs = micros();
-  renderKeys();
-  profiler.add(WolfProfiler::Slot::Keys, micros() - sectionStartUs);
-
   uint32_t nowMs = millis();
   sectionStartUs = micros();
-  renderZombies(nowMs);
-  profiler.add(WolfProfiler::Slot::ZombieRender, micros() - sectionStartUs);
+  renderSprites(nowMs);
+  profiler.add(WolfProfiler::Slot::Sprites, micros() - sectionStartUs);
 
   sectionStartUs = micros();
   renderWeapon(nowMs);
@@ -895,183 +891,47 @@ void Wolf3DGame::renderFpsCounter() {
   FontRenderer::drawText(FONT_5X7, fillRect, boxX + paddingX, boxY + paddingY, fpsText, textScale, text);
 }
 
-void Wolf3DGame::renderKeys() {
-  static constexpr int kPickupFloorOffsetDiv = 3;
-  float invDet = 1.0f / (planeX * dirY - dirX * planeY);
-  for (int mapY = 0; mapY < mapHeight; mapY++) {
-    for (int mapX = 0; mapX < mapWidth; mapX++) {
+void Wolf3DGame::renderSprites(uint32_t nowMs) {
+  int spriteCount = 0;
+
+  for (int mapY = 0; mapY < mapHeight && spriteCount < SpriteRenderer::MAX_SPRITES; mapY++) {
+    for (int mapX = 0; mapX < mapWidth && spriteCount < SpriteRenderer::MAX_SPRITES; mapX++) {
       uint8_t tile = map[mapY][mapX];
       if (!Keys::isPickup(tile)) {
         continue;
       }
-      const uint16_t* keyTexture = Keys::texture(tile);
-      if (keyTexture == nullptr) {
-        continue;
-      }
 
-      float spriteX = (static_cast<float>(mapX) + 0.5f) - playerX;
-      float spriteY = (static_cast<float>(mapY) + 0.5f) - playerY;
-      float transformX = invDet * (dirY * spriteX - dirX * spriteY);
-      float transformY = invDet * (-planeY * spriteX + planeX * spriteY);
-      if (transformY <= 0.15f) {
-        continue;
-      }
-
-      int spriteScreenX =
-        static_cast<int>((static_cast<float>(RENDER_W) * 0.5f) * (1.0f + transformX / transformY));
-      int spriteHeight = abs(static_cast<int>(static_cast<float>(RENDER_H) / transformY));
-      int spriteWidth = spriteHeight;
-      if (spriteWidth < 4) {
-        spriteWidth = 4;
-      }
-
-      int pickupFloorOffset = spriteHeight / kPickupFloorOffsetDiv;
-      int rawDrawEndY = (RENDER_H / 2) + (spriteHeight / 2) + pickupFloorOffset;
-      int rawDrawStartY = rawDrawEndY - spriteHeight + 1;
-      int drawStartY = rawDrawStartY;
-      int drawEndY = rawDrawEndY;
-      drawStartY = Math::clamp(drawStartY, 0, RENDER_H - 1);
-      drawEndY = Math::clamp(drawEndY, 0, RENDER_H - 1);
-
-      int rawDrawStartX = spriteScreenX - spriteWidth / 2;
-      int rawDrawEndX = spriteScreenX + spriteWidth / 2;
-      int drawStartX = rawDrawStartX;
-      int drawEndX = rawDrawEndX;
-      drawStartX = Math::clamp(drawStartX, 0, RENDER_W - 1);
-      drawEndX = Math::clamp(drawEndX, 0, RENDER_W - 1);
-      int texXStep = (Keys::TEX_SIZE << 16) / Math::clamp(spriteWidth, 1, 1 << 14);
-      int texXPos = (drawStartX - rawDrawStartX) * texXStep;
-      uint16_t shadedTexture[Keys::TEX_SIZE * Keys::TEX_SIZE];
-      for (int i = 0; i < Keys::TEX_SIZE * Keys::TEX_SIZE; i++) {
-        uint16_t color565 = keyTexture[i];
-        shadedTexture[i] = (color565 == 0) ? 0 : shadeColor(color565, transformY, false);
-      }
-
-      for (int stripe = drawStartX; stripe <= drawEndX; stripe++) {
-        if (transformY >= wallDepth[stripe]) {
-          texXPos += texXStep;
-          continue;
-        }
-
-        int texX = texXPos >> 16;
-        texX = Math::clamp(texX, 0, Keys::TEX_SIZE - 1);
-        texXPos += texXStep;
-        int texYStep = (Keys::TEX_SIZE << 16) / Math::clamp(spriteHeight, 1, 1 << 14);
-        int texYPos = (drawStartY - rawDrawStartY) * texYStep;
-
-        for (int y = drawStartY; y <= drawEndY; y++) {
-          int texY = texYPos >> 16;
-          texY = Math::clamp(texY, 0, Keys::TEX_SIZE - 1);
-          texYPos += texYStep;
-          uint16_t color565 = shadedTexture[texY * Keys::TEX_SIZE + texX];
-          if (color565 == 0) {
-            continue;
-          }
-          frameBuffer[y * RENDER_W + stripe] = color565;
-        }
-      }
+      Keys::initSprite(
+        spriteStorage[spriteCount],
+        tile,
+        static_cast<float>(mapX) + 0.5f,
+        static_cast<float>(mapY) + 0.5f);
+      spriteRefs[spriteCount] = &spriteStorage[spriteCount];
+      spriteCount++;
     }
   }
-}
 
-void Wolf3DGame::renderZombies(uint32_t nowMs) {
-  static constexpr int kZombieFloorOffsetDiv = 8;
-  int order[Zombie::MAX_COUNT]{};
-  float distances[Zombie::MAX_COUNT]{};
-  int renderCount = 0;
-  for (int i = 0; i < zombieCount; i++) {
+  for (int i = 0; i < zombieCount && spriteCount < SpriteRenderer::MAX_SPRITES; i++) {
     if (!zombies[i].isAlive()) {
       continue;
     }
-    float dx = zombies[i].getX() - playerX;
-    float dy = zombies[i].getY() - playerY;
-    order[renderCount] = i;
-    distances[renderCount] = dx * dx + dy * dy;
-    renderCount++;
+    spriteRefs[spriteCount] = &zombies[i].sprite();
+    spriteCount++;
   }
 
-  for (int i = 0; i < renderCount - 1; i++) {
-    for (int j = i + 1; j < renderCount; j++) {
-      if (distances[j] > distances[i]) {
-        float tmpDistance = distances[i];
-        distances[i] = distances[j];
-        distances[j] = tmpDistance;
-
-        int tmpOrder = order[i];
-        order[i] = order[j];
-        order[j] = tmpOrder;
-      }
-    }
-  }
-
-  float invDet = 1.0f / (planeX * dirY - dirX * planeY);
-  for (int i = 0; i < renderCount; i++) {
-    const Zombie& zombie = zombies[order[i]];
-    float spriteX = zombie.getX() - playerX;
-    float spriteY = zombie.getY() - playerY;
-    float transformX = invDet * (dirY * spriteX - dirX * spriteY);
-    float transformY = invDet * (-planeY * spriteX + planeX * spriteY);
-    if (transformY <= 0.15f) {
-      continue;
-    }
-
-    int spriteScreenX =
-      static_cast<int>((static_cast<float>(RENDER_W) * 0.5f) * (1.0f + transformX / transformY));
-    int spriteHeight = abs(static_cast<int>(static_cast<float>(RENDER_H) / transformY));
-    int spriteWidth = (spriteHeight * 3) / 4;
-    if (spriteWidth < 4) {
-      spriteWidth = 4;
-    }
-
-    int zombieFloorOffset = spriteHeight / kZombieFloorOffsetDiv;
-    int rawDrawEndY = (RENDER_H / 2) + (spriteHeight / 2) + zombieFloorOffset;
-    int rawDrawStartY = rawDrawEndY - spriteHeight + 1;
-    int drawStartY = rawDrawStartY;
-    int drawEndY = rawDrawEndY;
-    drawStartY = Math::clamp(drawStartY, 0, RENDER_H - 1);
-    drawEndY = Math::clamp(drawEndY, 0, RENDER_H - 1);
-
-    int rawDrawStartX = spriteScreenX - spriteWidth / 2;
-    int rawDrawEndX = spriteScreenX + spriteWidth / 2;
-    int drawStartX = rawDrawStartX;
-    int drawEndX = rawDrawEndX;
-    drawStartX = Math::clamp(drawStartX, 0, RENDER_W - 1);
-    drawEndX = Math::clamp(drawEndX, 0, RENDER_W - 1);
-    int texXStep = (Zombie::TEX_SIZE << 16) / Math::clamp(spriteWidth, 1, 1 << 14);
-    int texXPos = (drawStartX - rawDrawStartX) * texXStep;
-    int texYStep = (Zombie::TEX_SIZE << 16) / Math::clamp(spriteHeight, 1, 1 << 14);
-    uint16_t shadedTexture[Zombie::TEX_SIZE * Zombie::TEX_SIZE];
-    for (int texY = 0; texY < Zombie::TEX_SIZE; texY++) {
-      for (int texX = 0; texX < Zombie::TEX_SIZE; texX++) {
-        uint16_t color565 = zombie.texel(texX, texY, nowMs);
-        shadedTexture[texY * Zombie::TEX_SIZE + texX] =
-          (color565 == 0) ? 0 : shadeColor(color565, transformY, false);
-      }
-    }
-
-    for (int stripe = drawStartX; stripe <= drawEndX; stripe++) {
-      if (transformY >= wallDepth[stripe]) {
-        texXPos += texXStep;
-        continue;
-      }
-
-      int texX = texXPos >> 16;
-      texX = Math::clamp(texX, 0, Zombie::TEX_SIZE - 1);
-      texXPos += texXStep;
-      int texYPos = (drawStartY - rawDrawStartY) * texYStep;
-
-      for (int y = drawStartY; y <= drawEndY; y++) {
-        int texY = texYPos >> 16;
-        texY = Math::clamp(texY, 0, Zombie::TEX_SIZE - 1);
-        texYPos += texYStep;
-        uint16_t color565 = shadedTexture[texY * Zombie::TEX_SIZE + texX];
-        if (color565 == 0) {
-          continue;
-        }
-        frameBuffer[y * RENDER_W + stripe] = color565;
-      }
-    }
-  }
+  SpriteRenderer::RenderView view;
+  view.frameBuffer = frameBuffer;
+  view.width = RENDER_W;
+  view.height = RENDER_H;
+  view.wallDepth = wallDepth;
+  view.playerX = playerX;
+  view.playerY = playerY;
+  view.dirX = dirX;
+  view.dirY = dirY;
+  view.planeX = planeX;
+  view.planeY = planeY;
+  view.nowMs = nowMs;
+  SpriteRenderer::render(view, spriteRefs, spriteCount);
 }
 
 void Wolf3DGame::renderWeapon(uint32_t nowMs) {

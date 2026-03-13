@@ -38,6 +38,7 @@ void Zombie::clear() {
   alive = false;
   nextShotMs = 0;
   attackUntilMs = 0;
+  renderSprite.clear();
 }
 
 void Zombie::spawn(float spawnX, float spawnY) {
@@ -46,6 +47,7 @@ void Zombie::spawn(float spawnX, float spawnY) {
   alive = true;
   nextShotMs = 0;
   attackUntilMs = 0;
+  renderSprite.configure(x, y, TEX_SIZE, 3, 4, 8, 12.0f, this, buildSpriteTexture);
 }
 
 bool Zombie::isAlive() const {
@@ -66,6 +68,7 @@ bool Zombie::isAttacking(uint32_t nowMs) const {
 
 void Zombie::kill() {
   alive = false;
+  renderSprite.clear();
 }
 
 void Zombie::update(const WorldView& world, int& damageOut) {
@@ -89,11 +92,13 @@ void Zombie::update(const WorldView& world, int& damageOut) {
     float nextX = x + moveX;
     if (!blockedAt(world, nextX, y)) {
       x = nextX;
+      renderSprite.setPosition(x, y);
     }
 
     float nextY = y + moveY;
     if (!blockedAt(world, x, nextY)) {
       y = nextY;
+      renderSprite.setPosition(x, y);
     }
   }
 
@@ -162,6 +167,15 @@ uint16_t Zombie::texel(int texX, int texY, uint32_t nowMs) const {
     return Color565::rgb(64, 56, 50);
   }
   return 0;
+}
+
+void Zombie::buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_t nowMs) {
+  const Zombie& zombie = *static_cast<const Zombie*>(owner);
+  for (int texY = 0; texY < TEX_SIZE; texY++) {
+    for (int texX = 0; texX < TEX_SIZE; texX++) {
+      outTexture[texY * TEX_SIZE + texX] = zombie.texel(texX, texY, nowMs);
+    }
+  }
 }
 
 void Zombie::loadSpawns(Zombie* zombies, int& zombieCount, const char* layout) {

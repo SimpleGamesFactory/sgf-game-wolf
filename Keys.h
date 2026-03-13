@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "Sprite.h"
+
 enum class KeyColor : uint8_t {
   None = 0,
   Red,
@@ -23,5 +25,6 @@ uint16_t color565(KeyColor color);
 uint16_t minimapColor(uint8_t tile);
 uint16_t texel(uint8_t tile, int texX, int texY);
 const uint16_t* texture(uint8_t tile);
+void initSprite(WolfRender::Sprite& sprite, uint8_t tile, float x, float y);
 
 }  // namespace Keys

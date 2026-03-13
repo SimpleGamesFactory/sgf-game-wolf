@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "Sprite.h"
+
 class Zombie {
 public:
   static constexpr int MAX_COUNT = 16;
@@ -36,6 +38,7 @@ public:
   void update(const WorldView& world, int& damageOut);
   bool tryHit(const AimView& aim, float& hitDistance) const;
   uint16_t texel(int texX, int texY, uint32_t nowMs) const;
+  const WolfRender::ISprite& sprite() const { return renderSprite; }
 
   static void loadSpawns(Zombie* zombies, int& zombieCount, const char* layout);
 
@@ -54,7 +57,9 @@ private:
   bool alive = false;
   uint32_t nextShotMs = 0;
   uint32_t attackUntilMs = 0;
+  WolfRender::Sprite renderSprite;
 
   static bool lineBlocked(const WorldView& world, float fromX, float fromY, float toX, float toY);
+  static void buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_t nowMs);
   bool blockedAt(const WorldView& world, float nextX, float nextY) const;
 };

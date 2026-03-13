@@ -33,6 +33,8 @@
 #include "Hud.h"
 #include "Keys.h"
 #include "Map.h"
+#include "Sprite.h"
+#include "SpriteRenderer.h"
 #include "WolfProfiler.h"
 #include "Zombie.h"
 
@@ -127,6 +129,8 @@ private:
   uint16_t frameBuffer[RENDER_W * RENDER_H]{};
   uint16_t upscaleBuffers[UPSCALE_BUFFER_COUNT][MAX_SCREEN_W * UPSCALE * UPSCALE_CHUNK_SRC_ROWS]{};
   float wallDepth[RENDER_W]{};
+  WolfRender::Sprite spriteStorage[SpriteRenderer::MAX_SPRITES]{};
+  const WolfRender::ISprite* spriteRefs[SpriteRenderer::MAX_SPRITES]{};
 
   float playerX = 3.5f;
   float playerY = 3.5f;
@@ -193,9 +197,8 @@ private:
   void clearFrame();
   void renderFloor();
   void renderFpsCounter();
-  void renderKeys();
+  void renderSprites(uint32_t nowMs);
   void renderWorld();
-  void renderZombies(uint32_t nowMs);
   void renderWeapon(uint32_t nowMs);
   void renderColumn(
     int x,
