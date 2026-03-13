@@ -359,6 +359,28 @@ void Wolf3DGame::onBlockedMove() {
   applyDamage(DAMAGE_ON_BUMP);
 }
 
+void Wolf3DGame::updateHeadBob(float delta, bool moved) {
+  if (moved) {
+    headBobPhase += delta * HEAD_BOB_SPEED;
+    if (headBobPhase > 6.2831853f) {
+      headBobPhase = fmodf(headBobPhase, 6.2831853f);
+    }
+    headBobOffset = sinf(headBobPhase) * HEAD_BOB_AMPLITUDE;
+    return;
+  }
+
+  float settle = Math::clamp(delta * HEAD_BOB_SETTLE, 0.0f, 1.0f);
+  headBobOffset += (0.0f - headBobOffset) * settle;
+  if (fabsf(headBobOffset) < 0.05f) {
+    headBobOffset = 0.0f;
+    headBobPhase = 0.0f;
+  }
+}
+
+int Wolf3DGame::bobOffsetY() const {
+  return static_cast<int>(roundf(headBobOffset));
+}
+
 void Wolf3DGame::rotate(float angle) {
   float oldDirX = dirX;
   float cosA = cosf(angle);
@@ -482,6 +504,7 @@ void Wolf3DGame::applyDamage(int amount) {
 void Wolf3DGame::updateInput(float delta) {
   bool minimapShortcut = leftAction.isPressed() && rightAction.isPressed();
   bool strafing = fireAction.isPressed() && (leftAction.isPressed() || rightAction.isPressed());
+  bool moved = false;
   uint32_t nowMs = millis();
   if (minimapShortcut) {
     if (!minimapShortcutHeld) {
@@ -511,11 +534,15 @@ void Wolf3DGame::updateInput(float delta) {
   if (upAction.isPressed() && !fireAction.isPressed()) {
     if (!attemptMove(playerX + dirX * moveStep, playerY + dirY * moveStep)) {
       onBlockedMove();
+    } else {
+      moved = true;
     }
   }
   if (downAction.isPressed()) {
     if (!attemptMove(playerX - dirX * moveStep, playerY - dirY * moveStep)) {
       onBlockedMove();
+    } else {
+      moved = true;
     }
   }
 
@@ -525,11 +552,15 @@ void Wolf3DGame::updateInput(float delta) {
     if (leftAction.isPressed()) {
       if (!attemptMove(playerX - sideX * strafeStep, playerY - sideY * strafeStep)) {
         onBlockedMove();
+      } else {
+        moved = true;
       }
     }
     if (rightAction.isPressed()) {
       if (!attemptMove(playerX + sideX * strafeStep, playerY + sideY * strafeStep)) {
         onBlockedMove();
+      } else {
+        moved = true;
       }
     }
   } else {
@@ -541,6 +572,7 @@ void Wolf3DGame::updateInput(float delta) {
     }
   }
 
+  updateHeadBob(delta, moved);
   collectPickupUnderPlayer();
 }
 
@@ -719,14 +751,15 @@ void Wolf3DGame::presentFrame() {
 }
 
 void Wolf3DGame::clearFrame() {
+  int horizon = Math::clamp((RENDER_H / 2) + bobOffsetY(), 1, RENDER_H - 1);
   for (int y = 0; y < RENDER_H; y++) {
-    bool isSky = y < RENDER_H / 2;
+    bool isSky = y < horizon;
     float bandT;
     if (isSky) {
-      bandT = static_cast<float>(y) / static_cast<float>(RENDER_H / 2);
+      bandT = static_cast<float>(y) / static_cast<float>(horizon);
     } else {
-      bandT = static_cast<float>(y - RENDER_H / 2) /
-              static_cast<float>(RENDER_H - RENDER_H / 2);
+      bandT = static_cast<float>(y - horizon) /
+              static_cast<float>(RENDER_H - horizon);
     }
 
     uint16_t color565;
@@ -770,6 +803,7 @@ void Wolf3DGame::renderFloor() {
 }
 
 void Wolf3DGame::renderWorld() {
+  int centerY = (RENDER_H / 2) + bobOffsetY();
   for (int x = 0; x < RENDER_W; x++) {
     float cameraX = 2.0f * static_cast<float>(x) / static_cast<float>(RENDER_W) - 1.0f;
     float rayDirX = dirX + planeX * cameraX;
@@ -832,9 +866,9 @@ void Wolf3DGame::renderWorld() {
     }
 
     int lineHeight = static_cast<int>(static_cast<float>(RENDER_H) / perpWallDist);
-    int rawDrawStart = (-lineHeight / 2) + (RENDER_H / 2);
+    int rawDrawStart = (-lineHeight / 2) + centerY;
     int drawStart = rawDrawStart;
-    int drawEnd = (lineHeight / 2) + (RENDER_H / 2);
+    int drawEnd = (lineHeight / 2) + centerY;
     if (drawStart < 0) {
       drawStart = 0;
     }
@@ -931,6 +965,7 @@ void Wolf3DGame::renderSprites(uint32_t nowMs) {
   view.dirY = dirY;
   view.planeX = planeX;
   view.planeY = planeY;
+  view.cameraYOffset = bobOffsetY();
   view.nowMs = nowMs;
   SpriteRenderer::render(view, spriteRefs, spriteCount);
 }
@@ -944,7 +979,7 @@ void Wolf3DGame::renderWeapon(uint32_t nowMs) {
   const int gunW = 28;
   const int gunH = 18;
   int baseX = (RENDER_W - gunW) / 2;
-  int baseY = RENDER_H - gunH - 2;
+  int baseY = RENDER_H - gunH - 2 + bobOffsetY();
 
   fillRect(baseX + 10, baseY + 2, 12, 5, metal);
   fillRect(baseX + 12, baseY + 1, 8, 2, darkMetal);
@@ -963,9 +998,9 @@ void Wolf3DGame::renderWeapon(uint32_t nowMs) {
     putPixel(baseX + 24, baseY + 9, muzzle);
   }
 
-  putPixel(RENDER_W / 2, (RENDER_H / 2) + 2, Color565::rgb(240, 240, 240));
-  putPixel((RENDER_W / 2) - 2, (RENDER_H / 2) + 2, Color565::rgb(200, 200, 200));
-  putPixel((RENDER_W / 2) + 2, (RENDER_H / 2) + 2, Color565::rgb(200, 200, 200));
+  putPixel(RENDER_W / 2, (RENDER_H / 2) + 2 + bobOffsetY(), Color565::rgb(240, 240, 240));
+  putPixel((RENDER_W / 2) - 2, (RENDER_H / 2) + 2 + bobOffsetY(), Color565::rgb(200, 200, 200));
+  putPixel((RENDER_W / 2) + 2, (RENDER_H / 2) + 2 + bobOffsetY(), Color565::rgb(200, 200, 200));
 }
 
 void Wolf3DGame::renderColumn(

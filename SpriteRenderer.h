@@ -20,6 +20,7 @@ struct RenderView {
   float dirY = 0.0f;
   float planeX = 0.0f;
   float planeY = 0.0f;
+  int cameraYOffset = 0;
   uint32_t nowMs = 0;
 };
 

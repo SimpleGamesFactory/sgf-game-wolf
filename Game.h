@@ -72,6 +72,9 @@ private:
   static constexpr float MOVE_SPEED = 2.2f;
   static constexpr float STRAFE_SPEED = 2.2f;
   static constexpr float TURN_SPEED = 2.4f;
+  static constexpr float HEAD_BOB_SPEED = 12.0f;
+  static constexpr float HEAD_BOB_AMPLITUDE = 1.5f;
+  static constexpr float HEAD_BOB_SETTLE = 10.0f;
   static constexpr float CAMERA_PLANE_SCALE = WOLF_CAMERA_PLANE_SCALE;
   static constexpr float PLAYER_RADIUS = WOLF_PLAYER_RADIUS;
   static constexpr int MINIMAP_CELL = 5;
@@ -138,6 +141,8 @@ private:
   float dirY = 0.0f;
   float planeX = 0.0f;
   float planeY = CAMERA_PLANE_SCALE;
+  float headBobPhase = 0.0f;
+  float headBobOffset = 0.0f;
   uint32_t frameCounter = 0;
   uint16_t displayedFps = 0;
   uint16_t fpsSampleFrames = 0;
@@ -181,6 +186,8 @@ private:
   bool attemptMove(float nextX, float nextY);
   void onBlockedMove();
   void rotate(float angle);
+  void updateHeadBob(float delta, bool moved);
+  int bobOffsetY() const;
   bool toggleDoorAhead();
   bool canCloseDoor(int cellX, int cellY) const;
   void collectPickupUnderPlayer();

@@ -92,7 +92,7 @@ void render(const RenderView& view, const WolfRender::ISprite* const* sprites, i
 
     int floorDiv = sprite.floorOffsetDiv();
     int floorOffset = (floorDiv > 0) ? (spriteHeight / floorDiv) : 0;
-    int rawDrawEndY = (view.height / 2) + (spriteHeight / 2) + floorOffset;
+    int rawDrawEndY = (view.height / 2) + (spriteHeight / 2) + floorOffset + view.cameraYOffset;
     int rawDrawStartY = rawDrawEndY - spriteHeight + 1;
     int drawStartY = Math::clamp(rawDrawStartY, 0, view.height - 1);
     int drawEndY = Math::clamp(rawDrawEndY, 0, view.height - 1);
