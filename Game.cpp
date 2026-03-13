@@ -327,13 +327,22 @@ bool Wolf3DGame::wallAt(int cellX, int cellY) const {
   return true;
 }
 
+bool Wolf3DGame::blockedAt(float testX, float testY) const {
+  const float r = PLAYER_RADIUS;
+  return
+    wallAt(static_cast<int>(testX - r), static_cast<int>(testY - r)) ||
+    wallAt(static_cast<int>(testX + r), static_cast<int>(testY - r)) ||
+    wallAt(static_cast<int>(testX - r), static_cast<int>(testY + r)) ||
+    wallAt(static_cast<int>(testX + r), static_cast<int>(testY + r));
+}
+
 bool Wolf3DGame::attemptMove(float nextX, float nextY) {
   bool moved = false;
-  if (!wallAt(static_cast<int>(nextX), static_cast<int>(playerY))) {
+  if (!blockedAt(nextX, playerY)) {
     playerX = nextX;
     moved = true;
   }
-  if (!wallAt(static_cast<int>(playerX), static_cast<int>(nextY))) {
+  if (!blockedAt(playerX, nextY)) {
     playerY = nextY;
     moved = true;
   }
@@ -826,7 +835,8 @@ void Wolf3DGame::renderWorld() {
     }
 
     int lineHeight = static_cast<int>(static_cast<float>(RENDER_H) / perpWallDist);
-    int drawStart = (-lineHeight / 2) + (RENDER_H / 2);
+    int rawDrawStart = (-lineHeight / 2) + (RENDER_H / 2);
+    int drawStart = rawDrawStart;
     int drawEnd = (lineHeight / 2) + (RENDER_H / 2);
     if (drawStart < 0) {
       drawStart = 0;
@@ -855,7 +865,7 @@ void Wolf3DGame::renderWorld() {
     }
 
     wallDepth[x] = perpWallDist;
-    renderColumn(x, drawStart, drawEnd, tile, texX, perpWallDist, side);
+    renderColumn(x, lineHeight, rawDrawStart, drawStart, drawEnd, tile, texX, perpWallDist, side);
   }
 }
 
@@ -1095,6 +1105,8 @@ void Wolf3DGame::renderWeapon(uint32_t nowMs) {
 
 void Wolf3DGame::renderColumn(
   int x,
+  int lineHeight,
+  int rawDrawStart,
   int drawStart,
   int drawEnd,
   uint8_t tile,
@@ -1113,10 +1125,13 @@ void Wolf3DGame::renderColumn(
   for (int texY = 0; texY < TEX_SIZE; texY++) {
     shadedColumn[texY] = shadeColor(wallTexel(tile, texX, texY), distance, side);
   }
-  int texStep = (TEX_SIZE << 16) / span;
-  int texPos = 0;
+  int texStep = (TEX_SIZE << 16) / Math::clamp(lineHeight, 1, 1 << 14);
+  int texPos = (drawStart - rawDrawStart) * texStep;
   for (int y = drawStart; y <= drawEnd; y++) {
     int texY = texPos >> 16;
+    if (texY < 0) {
+      texY = 0;
+    }
     if (texY >= TEX_SIZE) {
       texY = TEX_SIZE - 1;
     }

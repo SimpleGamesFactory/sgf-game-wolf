@@ -14,6 +14,14 @@
 #define WOLF_SIMPLE_FLOOR 1
 #endif
 
+#ifndef WOLF_CAMERA_PLANE_SCALE
+#define WOLF_CAMERA_PLANE_SCALE 0.66f
+#endif
+
+#ifndef WOLF_PLAYER_RADIUS
+#define WOLF_PLAYER_RADIUS 0.28f
+#endif
+
 #include "SGF/ActionState.h"
 #include "SGF/IFillRect.h"
 #include "SGF/Font5x7.h"
@@ -62,7 +70,8 @@ private:
   static constexpr float MOVE_SPEED = 2.2f;
   static constexpr float STRAFE_SPEED = 2.2f;
   static constexpr float TURN_SPEED = 2.4f;
-  static constexpr float CAMERA_PLANE_SCALE = 0.66f;
+  static constexpr float CAMERA_PLANE_SCALE = WOLF_CAMERA_PLANE_SCALE;
+  static constexpr float PLAYER_RADIUS = WOLF_PLAYER_RADIUS;
   static constexpr int MINIMAP_CELL = 5;
   static constexpr int MINIMAP_MARGIN = 6;
   static constexpr int START_AMMO = 99;
@@ -164,6 +173,7 @@ private:
   bool isDoorOpen(int cellX, int cellY) const;
   void setDoorOpen(int cellX, int cellY, bool open);
   bool wallAt(int cellX, int cellY) const;
+  bool blockedAt(float testX, float testY) const;
   bool attemptMove(float nextX, float nextY);
   void onBlockedMove();
   void rotate(float angle);
@@ -189,6 +199,8 @@ private:
   void renderWeapon(uint32_t nowMs);
   void renderColumn(
     int x,
+    int lineHeight,
+    int rawDrawStart,
     int drawStart,
     int drawEnd,
     uint8_t tile,
