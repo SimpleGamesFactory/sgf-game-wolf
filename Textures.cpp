@@ -29,8 +29,11 @@ bool catalogReady = false;
 const char* lastLookupName = nullptr;
 Asset* lastLookupAsset = nullptr;
 
-bool isSpriteAsset(const char* name) {
-  return name != nullptr && strncmp(name, "sprite_", 7) == 0;
+bool usesTransparentIndex0(const char* name) {
+  if (name == nullptr) {
+    return false;
+  }
+  return strncmp(name, "sprite_", 7) == 0 || strncmp(name, "weapon_", 7) == 0;
 }
 
 uint16_t readU16(const uint8_t*& cursor, const uint8_t* end) {
@@ -54,7 +57,7 @@ int clampCoord(int value) {
 }
 
 uint16_t decodePaletteIndex(const Entry& entry, uint8_t paletteIndex) {
-  if (isSpriteAsset(entry.asset.name) && paletteIndex == 0u) {
+  if (usesTransparentIndex0(entry.asset.name) && paletteIndex == 0u) {
     return 0;
   }
   if (paletteIndex >= PALETTE_SIZE) {

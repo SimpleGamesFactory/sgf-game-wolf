@@ -70,6 +70,8 @@ uint8_t Map::decodeTile(char symbol) {
     case 'r': return 'r';
     case 'g': return 'g';
     case 'b': return 'b';
+    case 'a': return 'a';
+    case 'h': return 'h';
     default: return 0;
   }
 }

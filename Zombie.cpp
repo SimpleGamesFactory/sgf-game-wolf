@@ -53,6 +53,7 @@ bool wallAt(const Zombie::WorldView& world, int cellX, int cellY) {
 void Zombie::clear() {
   x = 0.0f;
   y = 0.0f;
+  hp = 0;
   alive = false;
   nextShotMs = 0;
   attackUntilMs = 0;
@@ -62,6 +63,7 @@ void Zombie::clear() {
 void Zombie::spawn(float spawnX, float spawnY) {
   x = spawnX;
   y = spawnY;
+  hp = MAX_HP;
   alive = true;
   nextShotMs = 0;
   attackUntilMs = 0;
@@ -85,8 +87,19 @@ bool Zombie::isAttacking(uint32_t nowMs) const {
 }
 
 void Zombie::kill() {
+  hp = 0;
   alive = false;
   renderSprite.clear();
+}
+
+void Zombie::applyDamage(int amount) {
+  if (!alive || amount <= 0) {
+    return;
+  }
+  hp -= amount;
+  if (hp <= 0) {
+    kill();
+  }
 }
 
 void Zombie::update(const WorldView& world, int& damageOut) {

@@ -4,6 +4,7 @@
 
 #include "Door.h"
 #include "Keys.h"
+#include "Pickups.h"
 #include "SGF/Color565.h"
 
 namespace {
@@ -128,9 +129,9 @@ void Minimap::render(
       if (doorOpenAmounts != nullptr) {
         openAmount = doorOpenAmounts[y * mapStride + x];
       }
-      bool isKey = Keys::isPickup(tile);
+      bool isPickup = Pickups::isPickup(tile);
       uint16_t color565 =
-        (tile && !isKey) ? tileColor(tile, openAmount) : Color565::rgb(18, 22, 26);
+        (tile && !isPickup) ? tileColor(tile, openAmount) : Color565::rgb(18, 22, 26);
       drawRect(
         buffer,
         width,
@@ -140,7 +141,7 @@ void Minimap::render(
         cell - 1,
         cell - 1,
         color565);
-      if (isKey) {
+      if (isPickup) {
         drawRect(
           buffer,
           width,
@@ -149,7 +150,7 @@ void Minimap::render(
           mapY0 + y * cell + 1,
           cell - 3,
           cell - 3,
-          Keys::minimapColor(tile));
+          Pickups::minimapColor(tile));
       }
     }
   }

@@ -57,8 +57,10 @@
 #include "Hud.h"
 #include "Keys.h"
 #include "Map.h"
+#include "Pickups.h"
 #include "Sprite.h"
 #include "SpriteRenderer.h"
+#include "WeaponRenderer.h"
 #include "Walls.h"
 #include "WolfProfiler.h"
 #include "Zombie.h"
@@ -115,7 +117,7 @@ private:
   static constexpr float PLAYER_RADIUS = WOLF_PLAYER_RADIUS;
   static constexpr int MINIMAP_CELL = 5;
   static constexpr int MINIMAP_MARGIN = 6;
-  static constexpr int START_AMMO = 99;
+  static constexpr int START_AMMO = 10;
   static constexpr int START_LIVES = 3;
   static constexpr int START_ENERGY = 100;
   static constexpr int DAMAGE_ON_BUMP = 6;
@@ -245,6 +247,7 @@ private:
   bool toggleDoorAhead();
   bool canCloseDoor(int cellX, int cellY) const;
   void collectPickupUnderPlayer();
+  int shotDamage(float hitDistance) const;
   void shoot();
   void applyDamage(int amount);
   void updateInput(float delta);

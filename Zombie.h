@@ -35,6 +35,7 @@ public:
   float getY() const;
   bool isAttacking(uint32_t nowMs) const;
   void kill();
+  void applyDamage(int amount);
   void update(const WorldView& world, int& damageOut);
   bool tryHit(const AimView& aim, float& hitDistance) const;
   uint16_t texel(int texX, int texY, uint32_t nowMs) const;
@@ -49,11 +50,13 @@ private:
   static constexpr float SHOOT_RANGE = 4.5f;
   static constexpr float MOVE_SPEED = 0.72f;
   static constexpr int DAMAGE = 7;
+  static constexpr int MAX_HP = 18;
   static constexpr uint32_t SHOT_COOLDOWN_MS = 900;
   static constexpr uint32_t ATTACK_FLASH_MS = 140;
 
   float x = 0.0f;
   float y = 0.0f;
+  int hp = 0;
   bool alive = false;
   uint32_t nextShotMs = 0;
   uint32_t attackUntilMs = 0;

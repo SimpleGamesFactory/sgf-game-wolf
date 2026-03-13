@@ -14,10 +14,12 @@
 #include "Keys.h"
 #include "Map.h"
 #include "Minimap.h"
+#include "Pickups.h"
 #include "SGF/Color565.h"
 #include "SGF/FontRenderer.h"
 #include "SGF/IFillRect.h"
 #include "SGF/Math.h"
+#include "WeaponRenderer.h"
 #include "Walls.h"
 
 namespace {
@@ -401,7 +403,7 @@ bool Wolf3DGame::wallAt(int cellX, int cellY) const {
   if (tile == 0) {
     return false;
   }
-  if (Keys::isPickup(tile)) {
+  if (Pickups::isPickup(tile)) {
     return false;
   }
   if (Door::isTile(tile)) {
@@ -550,13 +552,43 @@ void Wolf3DGame::collectPickupUnderPlayer() {
   }
 
   uint8_t tile = map[cellY][cellX];
-  if (!Keys::isPickup(tile)) {
+  if (!Pickups::isPickup(tile)) {
     return;
   }
+  bool consumed = false;
+  if (Pickups::isKey(tile)) {
+    keysOwned |= Keys::bitFor(Keys::colorForPickup(tile));
+    hud.setKeys(keysOwned);
+    consumed = true;
+  } else if (Pickups::isAmmo(tile)) {
+    if (ammo < Pickups::MAX_AMMO) {
+      ammo += Pickups::AMMO_PICKUP_AMOUNT;
+      if (ammo > Pickups::MAX_AMMO) {
+        ammo = Pickups::MAX_AMMO;
+      }
+      hud.setAmmo(ammo);
+      consumed = true;
+    }
+  } else if (Pickups::isMedkit(tile)) {
+    if (energy < START_ENERGY) {
+      energy += Pickups::MEDKIT_PICKUP_AMOUNT;
+      if (energy > START_ENERGY) {
+        energy = START_ENERGY;
+      }
+      hud.setEnergy(energy);
+      consumed = true;
+    }
+  }
+  if (consumed) {
+    map[cellY][cellX] = 0;
+  }
+}
 
-  keysOwned |= Keys::bitFor(Keys::colorForPickup(tile));
-  map[cellY][cellX] = 0;
-  hud.setKeys(keysOwned);
+int Wolf3DGame::shotDamage(float hitDistance) const {
+  float distance = Math::clamp(hitDistance, 0.0f, 8.0f);
+  float baseDamage = 10.0f - distance * 0.9f;
+  int damage = static_cast<int>(roundf(baseDamage)) + random(-2, 3);
+  return Math::clamp(damage, 1, 12);
 }
 
 void Wolf3DGame::shoot() {
@@ -582,7 +614,7 @@ void Wolf3DGame::shoot() {
     }
   }
   if (targetIndex >= 0) {
-    zombies[targetIndex].kill();
+    zombies[targetIndex].applyDamage(shotDamage(bestDistance));
   }
 }
 
@@ -977,7 +1009,7 @@ void Wolf3DGame::renderWorld() {
       }
 
       tile = map[mapY][mapX];
-      if (tile == 0 || Keys::isPickup(tile)) {
+      if (tile == 0 || Pickups::isPickup(tile)) {
         continue;
       }
 
@@ -1105,11 +1137,11 @@ void Wolf3DGame::renderSprites(uint32_t nowMs) {
   for (int mapY = 0; mapY < mapHeight && spriteCount < SpriteRenderer::MAX_SPRITES; mapY++) {
     for (int mapX = 0; mapX < mapWidth && spriteCount < SpriteRenderer::MAX_SPRITES; mapX++) {
       uint8_t tile = map[mapY][mapX];
-      if (!Keys::isPickup(tile)) {
+      if (!Pickups::isPickup(tile)) {
         continue;
       }
 
-      Keys::initSprite(
+      Pickups::initSprite(
         spriteStorage[spriteCount],
         tile,
         static_cast<float>(mapX) + 0.5f,
@@ -1144,32 +1176,9 @@ void Wolf3DGame::renderSprites(uint32_t nowMs) {
 }
 
 void Wolf3DGame::renderWeapon(uint32_t nowMs) {
-  const uint16_t metal = Color565::rgb(124, 130, 142);
-  const uint16_t darkMetal = Color565::rgb(76, 82, 92);
-  const uint16_t grip = Color565::rgb(78, 54, 38);
-  const uint16_t muzzle = Color565::rgb(240, 188, 84);
-  const uint16_t muzzleHot = Color565::rgb(255, 246, 210);
-  const int gunW = 28;
-  const int gunH = 18;
-  int baseX = (RENDER_W - gunW) / 2;
-  int baseY = RENDER_H - gunH - 2 + bobOffsetY();
-
-  fillRect(baseX + 10, baseY + 2, 12, 5, metal);
-  fillRect(baseX + 12, baseY + 1, 8, 2, darkMetal);
-  fillRect(baseX + 16, baseY + 7, 4, 7, darkMetal);
-  fillRect(baseX + 9, baseY + 8, 7, 9, grip);
-  fillRect(baseX + 8, baseY + 13, 5, 4, darkMetal);
-  fillRect(baseX + 20, baseY + 7, 2, 2, metal);
-
   bool muzzleFlash =
     nowMs < shotUntilMs && (shotUntilMs - nowMs) > (FACE_SHOOT_MS - WEAPON_FLASH_MS);
-  if (muzzleFlash) {
-    fillRect(baseX + 22, baseY + 5, 3, 4, muzzle);
-    putPixel(baseX + 25, baseY + 6, muzzleHot);
-    putPixel(baseX + 25, baseY + 7, muzzle);
-    putPixel(baseX + 24, baseY + 4, muzzleHot);
-    putPixel(baseX + 24, baseY + 9, muzzle);
-  }
+  WeaponRenderer::render(frameBuffer, RENDER_W, RENDER_H, bobOffsetY(), muzzleFlash);
 
   putPixel(RENDER_W / 2, (RENDER_H / 2) + 2 + bobOffsetY(), Color565::rgb(240, 240, 240));
   putPixel((RENDER_W / 2) - 2, (RENDER_H / 2) + 2 + bobOffsetY(), Color565::rgb(200, 200, 200));
