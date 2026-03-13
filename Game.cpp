@@ -470,13 +470,25 @@ void Wolf3DGame::applyDamage(int amount) {
 }
 
 void Wolf3DGame::updateInput(float delta) {
-  bool minimapShortcut = fireAction.isPressed() && upAction.isPressed();
-  if (minimapShortcut && !minimapShortcutHeld) {
-    showMinimap = !showMinimap;
+  bool minimapShortcut = leftAction.isPressed() && rightAction.isPressed();
+  bool strafing = fireAction.isPressed() && (leftAction.isPressed() || rightAction.isPressed());
+  uint32_t nowMs = millis();
+  if (minimapShortcut) {
+    if (!minimapShortcutHeld) {
+      minimapShortcutHeld = true;
+      minimapShortcutTriggered = false;
+      minimapShortcutStartMs = nowMs;
+    } else if (!minimapShortcutTriggered &&
+               nowMs - minimapShortcutStartMs >= MINIMAP_HOLD_MS) {
+      showMinimap = !showMinimap;
+      minimapShortcutTriggered = true;
+    }
+  } else {
+    minimapShortcutHeld = false;
+    minimapShortcutTriggered = false;
   }
-  minimapShortcutHeld = minimapShortcut;
 
-  if (fireAction.isJustPressed()) {
+  if (fireAction.isJustPressed() && !strafing && !minimapShortcut) {
     if (!toggleDoorAhead()) {
       shoot();
     }
@@ -717,6 +729,9 @@ void Wolf3DGame::clearFrame() {
       uint8_t g = static_cast<uint8_t>(28.0f + bandT * 40.0f);
       uint8_t b = static_cast<uint8_t>(60.0f + bandT * 52.0f);
       color565 = Color565::rgb(r, g, b);
+    } else if (SIMPLE_FLOOR) {
+      uint8_t c = static_cast<uint8_t>(72.0f - bandT * 34.0f);
+      color565 = Color565::rgb(c, c, c + 4);
     } else {
       uint8_t r = static_cast<uint8_t>(28.0f - bandT * 12.0f);
       uint8_t g = static_cast<uint8_t>(20.0f - bandT * 8.0f);
@@ -732,6 +747,10 @@ void Wolf3DGame::clearFrame() {
 }
 
 void Wolf3DGame::renderFloor() {
+  if (SIMPLE_FLOOR) {
+    return;
+  }
+
   FloorRenderer::render(
     frameBuffer,
     RENDER_W,

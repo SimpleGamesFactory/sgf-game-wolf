@@ -2,6 +2,18 @@
 
 #include <stdint.h>
 
+#ifndef WOLF_VIEWPORT_W
+#define WOLF_VIEWPORT_W 200
+#endif
+
+#ifndef WOLF_VIEWPORT_H
+#define WOLF_VIEWPORT_H 140
+#endif
+
+#ifndef WOLF_SIMPLE_FLOOR
+#define WOLF_SIMPLE_FLOOR 1
+#endif
+
 #include "SGF/ActionState.h"
 #include "SGF/IFillRect.h"
 #include "SGF/Font5x7.h"
@@ -34,21 +46,22 @@ private:
   static constexpr int MAX_SCREEN_H = 240;
   static constexpr int HUD_H = 40;
   static constexpr int WORLD_AREA_H = MAX_SCREEN_H - HUD_H;
-  static constexpr int VIEWPORT_W = 240;
-  static constexpr int VIEWPORT_H = 180;
+  static constexpr int VIEWPORT_W = WOLF_VIEWPORT_W;
+  static constexpr int VIEWPORT_H = WOLF_VIEWPORT_H;
   static constexpr int VIEWPORT_X = (MAX_SCREEN_W - VIEWPORT_W) / 2;
   static constexpr int VIEWPORT_Y = (WORLD_AREA_H - VIEWPORT_H) / 2;
   static constexpr int UPSCALE = 2;
   static constexpr int UPSCALE_CHUNK_SRC_ROWS = 3;
   static constexpr int UPSCALE_BUFFER_COUNT = 2;
+  static constexpr bool SIMPLE_FLOOR = WOLF_SIMPLE_FLOOR != 0;
   static constexpr int RENDER_W = VIEWPORT_W / UPSCALE;
   static constexpr int RENDER_H = VIEWPORT_H / UPSCALE;
   static constexpr int TEX_SIZE = 16;
   static constexpr int MAP_MAX_W = Map::MAX_WIDTH;
   static constexpr int MAP_MAX_H = Map::MAX_HEIGHT;
   static constexpr float MOVE_SPEED = 2.2f;
-  static constexpr float STRAFE_SPEED = 1.8f;
-  static constexpr float TURN_SPEED = 1.8f;
+  static constexpr float STRAFE_SPEED = 2.2f;
+  static constexpr float TURN_SPEED = 2.4f;
   static constexpr float CAMERA_PLANE_SCALE = 0.66f;
   static constexpr int MINIMAP_CELL = 5;
   static constexpr int MINIMAP_MARGIN = 6;
@@ -63,6 +76,7 @@ private:
   static constexpr uint32_t FACE_BLINK_MS = 120;
   static constexpr uint32_t FACE_SHOOT_MS = 150;
   static constexpr uint32_t FACE_HURT_MS = 260;
+  static constexpr uint32_t MINIMAP_HOLD_MS = 250;
   static constexpr int HUD_LIVES_X = 4;
   static constexpr int HUD_LIVES_Y = 4;
   static constexpr int HUD_LIVES_W = 58;
@@ -121,6 +135,8 @@ private:
   uint8_t keysOwned = 0;
   bool showMinimap = false;
   bool minimapShortcutHeld = false;
+  bool minimapShortcutTriggered = false;
+  uint32_t minimapShortcutStartMs = 0;
   uint32_t damageFlashUntilMs = 0;
   uint32_t nextBlinkMs = 0;
   uint32_t blinkUntilMs = 0;

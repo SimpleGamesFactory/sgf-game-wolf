@@ -8,8 +8,9 @@
 
 namespace {
 
-static constexpr int CELL = 5;
-static constexpr int MARGIN = 6;
+static constexpr int MAX_CELL = 5;
+static constexpr int MIN_CELL = 2;
+static constexpr int BASE_MARGIN = 6;
 
 void putPixel(uint16_t* buffer, int width, int height, int x, int y, uint16_t color565) {
   if (x < 0 || x >= width || y < 0 || y >= height) {
@@ -86,14 +87,44 @@ void Minimap::render(
   float dirX,
   float dirY
 ) {
-  int mapPixelW = mapW * CELL;
-  int mapPixelH = mapH * CELL;
+  int margin = BASE_MARGIN;
+  int cellW = (width - (margin * 2)) / (mapW > 0 ? mapW : 1);
+  int cellH = (height - (margin * 2)) / (mapH > 0 ? mapH : 1);
+  int cell = cellW < cellH ? cellW : cellH;
+  if (cell > MAX_CELL) {
+    cell = MAX_CELL;
+  }
+  if (cell < MIN_CELL) {
+    cell = MIN_CELL;
+    margin = 2;
+  }
+
+  int mapPixelW = mapW * cell;
+  int mapPixelH = mapH * cell;
+  int boxX = margin - 2;
+  int boxY = margin - 2;
+
+  if (boxX + mapPixelW + 4 > width) {
+    boxX = width - (mapPixelW + 4);
+  }
+  if (boxY + mapPixelH + 4 > height) {
+    boxY = height - (mapPixelH + 4);
+  }
+  if (boxX < 0) {
+    boxX = 0;
+  }
+  if (boxY < 0) {
+    boxY = 0;
+  }
+
+  int mapX0 = boxX + 2;
+  int mapY0 = boxY + 2;
   drawRect(
     buffer,
     width,
     height,
-    MARGIN - 2,
-    MARGIN - 2,
+    boxX,
+    boxY,
     mapPixelW + 4,
     mapPixelH + 4,
     Color565::rgb(12, 16, 20));
@@ -109,31 +140,31 @@ void Minimap::render(
         buffer,
         width,
         height,
-        MARGIN + x * CELL,
-        MARGIN + y * CELL,
-        CELL - 1,
-        CELL - 1,
+        mapX0 + x * cell,
+        mapY0 + y * cell,
+        cell - 1,
+        cell - 1,
         color565);
       if (isKey) {
         drawRect(
           buffer,
           width,
           height,
-          MARGIN + x * CELL + 1,
-          MARGIN + y * CELL + 1,
-          CELL - 3,
-          CELL - 3,
+          mapX0 + x * cell + 1,
+          mapY0 + y * cell + 1,
+          cell - 3,
+          cell - 3,
           Keys::minimapColor(tile));
       }
     }
   }
 
-  int px = MARGIN + static_cast<int>(playerX * static_cast<float>(CELL));
-  int py = MARGIN + static_cast<int>(playerY * static_cast<float>(CELL));
+  int px = mapX0 + static_cast<int>(playerX * static_cast<float>(cell));
+  int py = mapY0 + static_cast<int>(playerY * static_cast<float>(cell));
   drawRect(buffer, width, height, px - 1, py - 1, 3, 3, Color565::rgb(255, 255, 255));
 
-  int lookX = px + static_cast<int>(dirX * static_cast<float>(CELL * 2));
-  int lookY = py + static_cast<int>(dirY * static_cast<float>(CELL * 2));
+  int lookX = px + static_cast<int>(dirX * static_cast<float>(cell * 2));
+  int lookY = py + static_cast<int>(dirY * static_cast<float>(cell * 2));
   int dx = abs(lookX - px);
   int sx = (px < lookX) ? 1 : -1;
   int dy = -abs(lookY - py);
