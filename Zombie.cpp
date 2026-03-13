@@ -1,12 +1,30 @@
 #include "Zombie.h"
 
 #include <math.h>
+#include <string.h>
 
 #include "Door.h"
 #include "SGF/Color565.h"
 #include "SGF/Math.h"
+#include "Textures.h"
 
 namespace {
+
+constexpr const char* ZOMBIE_TEXTURE_NAME = "sprite_zombie";
+
+uint16_t applyAttackTint(uint16_t color565) {
+  uint8_t r5 = (color565 >> 11) & 0x1F;
+  uint8_t g6 = (color565 >> 5) & 0x3F;
+  uint8_t b5 = color565 & 0x1F;
+  uint8_t r = static_cast<uint8_t>((r5 * 255) / 31);
+  uint8_t g = static_cast<uint8_t>((g6 * 255) / 63);
+  uint8_t b = static_cast<uint8_t>((b5 * 255) / 31);
+
+  r = static_cast<uint8_t>(Math::clamp(static_cast<int>(r) + 56, 0, 255));
+  g = static_cast<uint8_t>((static_cast<int>(g) * 3) / 4);
+  b = static_cast<uint8_t>((static_cast<int>(b) * 3) / 4);
+  return Color565::rgb(r, g, b);
+}
 
 bool doorIsOpen(const Zombie::WorldView& world, int cellX, int cellY) {
   if (!world.doorOpenBits) {
@@ -171,6 +189,19 @@ uint16_t Zombie::texel(int texX, int texY, uint32_t nowMs) const {
 
 void Zombie::buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_t nowMs) {
   const Zombie& zombie = *static_cast<const Zombie*>(owner);
+  const uint16_t* bmpTexture = Textures::pixels(ZOMBIE_TEXTURE_NAME);
+  if (bmpTexture != nullptr) {
+    memcpy(outTexture, bmpTexture, TEX_SIZE * TEX_SIZE * sizeof(uint16_t));
+    if (zombie.isAttacking(nowMs)) {
+      for (int i = 0; i < TEX_SIZE * TEX_SIZE; i++) {
+        if (outTexture[i] != 0) {
+          outTexture[i] = applyAttackTint(outTexture[i]);
+        }
+      }
+    }
+    return;
+  }
+
   for (int texY = 0; texY < TEX_SIZE; texY++) {
     for (int texX = 0; texX < TEX_SIZE; texX++) {
       outTexture[texY * TEX_SIZE + texX] = zombie.texel(texX, texY, nowMs);

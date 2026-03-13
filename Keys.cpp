@@ -1,13 +1,24 @@
 #include "Keys.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "SGF/Color565.h"
+#include "Textures.h"
 
 namespace Keys {
 namespace {
 
 constexpr int KEY_COLOR_COUNT = 3;
+
+const char* textureName(uint8_t tile) {
+  switch (tile) {
+    case 'r': return "sprite_key_red";
+    case 'g': return "sprite_key_green";
+    case 'b': return "sprite_key_blue";
+    default: return nullptr;
+  }
+}
 
 uint16_t lightVariant(uint16_t color565) {
   return Color565::lighten(color565);
@@ -61,7 +72,7 @@ uint16_t buildTexel(KeyColor color, int texX, int texY) {
 
 const uint16_t* textureForColor(KeyColor color) {
   static bool initialized = false;
-  static uint16_t textures[KEY_COLOR_COUNT][TEX_SIZE * TEX_SIZE];
+  static uint16_t* textures[KEY_COLOR_COUNT]{};
   if (!initialized) {
     for (int colorIdx = 0; colorIdx < KEY_COLOR_COUNT; colorIdx++) {
       KeyColor buildColor = KeyColor::Red;
@@ -69,6 +80,10 @@ const uint16_t* textureForColor(KeyColor color) {
         buildColor = KeyColor::Green;
       } else if (colorIdx == 2) {
         buildColor = KeyColor::Blue;
+      }
+      textures[colorIdx] = static_cast<uint16_t*>(malloc(TEX_SIZE * TEX_SIZE * sizeof(uint16_t)));
+      if (textures[colorIdx] == nullptr) {
+        continue;
       }
       for (int texY = 0; texY < TEX_SIZE; texY++) {
         for (int texX = 0; texX < TEX_SIZE; texX++) {
@@ -143,6 +158,10 @@ uint16_t texel(uint8_t tile, int texX, int texY) {
 }
 
 const uint16_t* texture(uint8_t tile) {
+  const uint16_t* bmpTexture = Textures::pixels(textureName(tile));
+  if (bmpTexture != nullptr) {
+    return bmpTexture;
+  }
   return textureForColor(colorForPickup(tile));
 }
 

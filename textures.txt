@@ -1,0 +1,42 @@
+Wolf Texture Manifest
+=====================
+
+Format:
+- map_char: ASCII symbol used in map layout
+- code: short codename for the object/tile
+- asset: texture asset name; BMP file is textures/<asset>.bmp
+- notes: source or special handling
+
+Walls
+-----
+map_char=#  code=wall_red      asset=wall_red        notes=BMP-backed, fallback in Walls.cpp
+map_char=A  code=wall_green    asset=wall_green      notes=BMP-backed, fallback in Walls.cpp
+map_char=B  code=wall_skull    asset=wall_skull      notes=BMP-backed, fallback in Walls.cpp
+map_char=C  code=wall_gold     asset=wall_gold       notes=BMP-backed, fallback in Walls.cpp
+map_char=E  code=wall_purple   asset=wall_purple     notes=BMP-backed, fallback in Walls.cpp
+map_char=F  code=wall_cyan     asset=wall_cyan       notes=BMP-backed, fallback in Walls.cpp
+map_char=G  code=wall_brown    asset=wall_brown      notes=BMP-backed, fallback in Walls.cpp
+map_char=H  code=wall_pink     asset=wall_pink       notes=BMP-backed, fallback in Walls.cpp
+map_char=I  code=wall_white    asset=wall_white      notes=BMP-backed, fallback in Walls.cpp
+
+Doors
+-----
+map_char=D  code=door_plain    asset=-               notes=procedural only, Door.cpp
+map_char=1  code=door_red      asset=-               notes=procedural only, locked red, Door.cpp
+map_char=2  code=door_green    asset=-               notes=procedural only, locked green, Door.cpp
+map_char=3  code=door_blue     asset=-               notes=procedural only, locked blue, Door.cpp
+
+Sprites
+-------
+map_char=r  code=key_red       asset=sprite_key_red  notes=BMP-backed, fallback in Keys.cpp
+map_char=g  code=key_green     asset=sprite_key_green notes=BMP-backed, fallback in Keys.cpp
+map_char=b  code=key_blue      asset=sprite_key_blue notes=BMP-backed, fallback in Keys.cpp
+map_char=@  code=zombie        asset=sprite_zombie   notes=BMP-backed, fallback in Zombie.cpp
+
+Other Map Symbols
+-----------------
+map_char=.  code=empty         asset=-               notes=empty floor cell
+map_char=>  code=spawn_east    asset=-               notes=player spawn/orientation
+map_char=<  code=spawn_west    asset=-               notes=player spawn/orientation
+map_char=^  code=spawn_north   asset=-               notes=player spawn/orientation
+map_char=v  code=spawn_south   asset=-               notes=player spawn/orientation
