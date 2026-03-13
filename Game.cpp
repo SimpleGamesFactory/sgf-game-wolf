@@ -210,16 +210,16 @@ void Wolf3DGame::onPhysics(float delta) {
 
   uint32_t sectionStartUs = micros();
   updateInput(delta);
-  profiler.add(WolfProfiler::Stage::Input, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::Input, micros() - sectionStartUs);
 
   sectionStartUs = micros();
   updateZombies(delta);
-  profiler.add(WolfProfiler::Stage::ZombieUpdate, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::ZombieUpdate, micros() - sectionStartUs);
 
   sectionStartUs = micros();
   updateHudAnimation();
-  profiler.add(WolfProfiler::Stage::HudAnim, micros() - sectionStartUs);
-  profiler.add(WolfProfiler::Stage::Physics, micros() - physicsStartUs);
+  profiler.add(WolfProfiler::Slot::HudAnim, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::Physics, micros() - physicsStartUs);
 }
 
 void Wolf3DGame::onProcess(float delta) {
@@ -229,19 +229,18 @@ void Wolf3DGame::onProcess(float delta) {
   renderFrame();
   uint32_t sectionStartUs = micros();
   presentFrame();
-  profiler.add(WolfProfiler::Stage::Present, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::Present, micros() - sectionStartUs);
 
   sectionStartUs = micros();
   hud.render();
-  profiler.add(WolfProfiler::Stage::HudRender, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::HudRender, micros() - sectionStartUs);
 
   sectionStartUs = micros();
   hud.flush(renderTarget);
-  profiler.add(WolfProfiler::Stage::HudFlush, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::HudFlush, micros() - sectionStartUs);
 
   frameCounter++;
   profiler.frame();
-  profiler.emitIfReady(nowMs, displayedFps);
 }
 
 void Wolf3DGame::resetMap() {
@@ -579,24 +578,24 @@ void Wolf3DGame::renderFrame() {
   clearFrame();
   uint32_t sectionStartUs = micros();
   renderFloor();
-  profiler.add(WolfProfiler::Stage::Floor, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::Floor, micros() - sectionStartUs);
 
   sectionStartUs = micros();
   renderWorld();
-  profiler.add(WolfProfiler::Stage::World, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::World, micros() - sectionStartUs);
 
   sectionStartUs = micros();
   renderKeys();
-  profiler.add(WolfProfiler::Stage::Keys, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::Keys, micros() - sectionStartUs);
 
   uint32_t nowMs = millis();
   sectionStartUs = micros();
   renderZombies(nowMs);
-  profiler.add(WolfProfiler::Stage::ZombieRender, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::ZombieRender, micros() - sectionStartUs);
 
   sectionStartUs = micros();
   renderWeapon(nowMs);
-  profiler.add(WolfProfiler::Stage::Weapon, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::Weapon, micros() - sectionStartUs);
 
   if (showMinimap) {
     sectionStartUs = micros();
@@ -613,11 +612,11 @@ void Wolf3DGame::renderFrame() {
       playerY,
       dirX,
       dirY);
-    profiler.add(WolfProfiler::Stage::Minimap, micros() - sectionStartUs);
+    profiler.add(WolfProfiler::Slot::Minimap, micros() - sectionStartUs);
   }
   sectionStartUs = micros();
   renderFpsCounter();
-  profiler.add(WolfProfiler::Stage::FpsOverlay, micros() - sectionStartUs);
+  profiler.add(WolfProfiler::Slot::FpsOverlay, micros() - sectionStartUs);
 }
 
 void Wolf3DGame::presentFrame() {

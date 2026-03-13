@@ -1,100 +1,69 @@
 #include "WolfProfiler.h"
 
-#include <Arduino.h>
-
 namespace {
 
-constexpr int STAGE_COUNT = static_cast<int>(WolfProfiler::Stage::Count);
+constexpr int SLOT_COUNT = static_cast<int>(WolfProfiler::Slot::Count);
 
 }  // namespace
 
-void WolfProfiler::begin(uint32_t baudRate) {
-  if (!serialReady) {
-    Serial.begin(baudRate);
-    serialReady = true;
+WolfProfiler::WolfProfiler()
+  : stageProfiler("prof", profilerSlots, static_cast<uint8_t>(Slot::Count)) {}
+
+void WolfProfiler::begin() {
+  if (initialized) {
+    return;
   }
-  resetWindow(millis());
+  for (int i = 0; i < SLOT_COUNT; i++) {
+    stageProfiler.setLabel(i, slotLabel(static_cast<Slot>(i)));
+  }
+  stageProfiler.setMode(static_cast<int>(Slot::Fps), Profiler::CounterSlot);
+  for (int i = 1; i < SLOT_COUNT; i++) {
+    stageProfiler.setMode(i, Profiler::SampleSlot);
+  }
+  initialized = true;
 }
 
-void WolfProfiler::add(Stage stage, uint32_t elapsedUs) {
-  accumUs[static_cast<int>(stage)] += elapsedUs;
+void WolfProfiler::add(Slot slot, uint32_t elapsedUs) {
+  stageProfiler.probe(static_cast<int>(slot), elapsedUs);
 }
 
 void WolfProfiler::frame() {
-  frameCount++;
+  stageProfiler.increment(static_cast<int>(Slot::Fps));
 }
 
-void WolfProfiler::emitIfReady(uint32_t nowMs, uint16_t fpsValue) {
-  if (!serialReady) {
-    return;
-  }
-  if (windowStartMs == 0) {
-    resetWindow(nowMs);
-  }
-
-  uint32_t elapsedMs = nowMs - windowStartMs;
-  if (elapsedMs < REPORT_INTERVAL_MS || frameCount == 0) {
-    return;
-  }
-
-  Serial.print("[prof] fps=");
-  Serial.print(fpsValue);
-  Serial.print(" frames=");
-  Serial.print(frameCount);
-  for (int i = 0; i < STAGE_COUNT; i++) {
-    uint32_t avgUs = accumUs[i] / frameCount;
-    Serial.print(' ');
-    Serial.print(stageLabel(static_cast<Stage>(i)));
-    Serial.print('=');
-    Serial.print(avgUs / 1000u);
-    Serial.print('.');
-    Serial.print((avgUs % 1000u) / 100u);
-    Serial.print("ms");
-  }
-  Serial.println();
-
-  resetWindow(nowMs);
-}
-
-void WolfProfiler::resetWindow(uint32_t nowMs) {
-  windowStartMs = nowMs;
-  frameCount = 0;
-  for (int i = 0; i < STAGE_COUNT; i++) {
-    accumUs[i] = 0;
-  }
-}
-
-const char* WolfProfiler::stageLabel(Stage stage) {
-  switch (stage) {
-    case Stage::Physics:
+const char* WolfProfiler::slotLabel(Slot slot) {
+  switch (slot) {
+    case Slot::Fps:
+      return "fps";
+    case Slot::Physics:
       return "physics";
-    case Stage::Input:
+    case Slot::Input:
       return "input";
-    case Stage::ZombieUpdate:
+    case Slot::ZombieUpdate:
       return "zupd";
-    case Stage::HudAnim:
+    case Slot::HudAnim:
       return "hudanim";
-    case Stage::Floor:
+    case Slot::Floor:
       return "floor";
-    case Stage::World:
+    case Slot::World:
       return "world";
-    case Stage::Keys:
+    case Slot::Keys:
       return "keys";
-    case Stage::ZombieRender:
+    case Slot::ZombieRender:
       return "zrend";
-    case Stage::Weapon:
+    case Slot::Weapon:
       return "weapon";
-    case Stage::Minimap:
+    case Slot::Minimap:
       return "minimap";
-    case Stage::FpsOverlay:
+    case Slot::FpsOverlay:
       return "fpsov";
-    case Stage::Present:
+    case Slot::Present:
       return "present";
-    case Stage::HudRender:
+    case Slot::HudRender:
       return "hudr";
-    case Stage::HudFlush:
+    case Slot::HudFlush:
       return "hudf";
-    case Stage::Count:
+    case Slot::Count:
       return "count";
   }
   return "?";

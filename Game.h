@@ -25,6 +25,7 @@ public:
   );
 
   void setup();
+  Profiler& stageProfiler() { return profiler.profiler(); }
 
 private:
   static constexpr uint32_t FRAME_DEFAULT_STEP_US = 16666u;

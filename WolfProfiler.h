@@ -2,9 +2,12 @@
 
 #include <stdint.h>
 
+#include "SGF/Profiler.h"
+
 class WolfProfiler {
 public:
-  enum class Stage : uint8_t {
+  enum class Slot : uint8_t {
+    Fps,
     Physics,
     Input,
     ZombieUpdate,
@@ -22,19 +25,18 @@ public:
     Count
   };
 
-  void begin(uint32_t baudRate = 115200u);
-  void add(Stage stage, uint32_t elapsedUs);
+  WolfProfiler();
+
+  void begin();
+  void add(Slot slot, uint32_t elapsedUs);
   void frame();
-  void emitIfReady(uint32_t nowMs, uint16_t fpsValue);
+  Profiler& profiler() { return stageProfiler; }
+  const Profiler& profiler() const { return stageProfiler; }
 
 private:
-  static constexpr uint32_t REPORT_INTERVAL_MS = 1000u;
+  Profiler::Slot profilerSlots[static_cast<int>(Slot::Count)]{};
+  Profiler stageProfiler;
+  bool initialized = false;
 
-  bool serialReady = false;
-  uint32_t windowStartMs = 0;
-  uint32_t frameCount = 0;
-  uint32_t accumUs[static_cast<int>(Stage::Count)]{};
-
-  void resetWindow(uint32_t nowMs);
-  static const char* stageLabel(Stage stage);
+  static const char* slotLabel(Slot slot);
 };

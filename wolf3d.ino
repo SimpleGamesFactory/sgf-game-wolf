@@ -11,16 +11,20 @@
 #define SGF_ESP32_ST7789_240X240_SPI_HZ 40000000u
 #endif
 
+#include "SGF.h"
 #include "SGFHardwarePresets.h"
 #include "Game.h"
 
 auto hardware = SGFHardwareProfile::makeRuntime();
 Wolf3DGame game(hardware.renderTarget(), hardware.screen(), hardware.profile);
+SerialMonitor serialMonitor(1000u, 115200u);
 
 void setup() {
   hardware.display.begin(hardware.profile.display.spiHz);
   hardware.display.setRotation(hardware.profile.display.rotation);
   hardware.display.setBacklight(hardware.profile.display.backlightLevel);
+  game.attachSerialMonitor(serialMonitor);
+  serialMonitor.attachProfiler(game.stageProfiler());
   game.setup();
 }
 
