@@ -5,6 +5,7 @@
 namespace Textures {
 
 constexpr int TEX_SIZE = 16;
+constexpr int PALETTE_SIZE = 128;
 
 struct Asset {
   const char* name;

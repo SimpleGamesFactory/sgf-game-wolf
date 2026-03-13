@@ -4,7 +4,8 @@
 
 namespace TexturesGenerated {
 
-extern const Textures::Asset ASSETS[];
-extern const int ASSET_COUNT;
+extern const uint8_t PALETTE_RGB[Textures::PALETTE_SIZE * 3];
+extern const uint8_t BLOB[];
+extern const unsigned int BLOB_SIZE;
 
 }

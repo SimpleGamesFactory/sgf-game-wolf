@@ -11,6 +11,7 @@ PALETTE_FILE = TEXTURES_DIR / "wolf-128.gpl"
 GENERATED_HEADER = PROJECT_DIR / "TexturesGenerated.h"
 GENERATED_CPP = PROJECT_DIR / "TexturesGenerated.cpp"
 TEX_SIZE = 16
+BLOB_MAGIC = 0x5754  # "WT"
 
 
 def write_text_if_changed(path: Path, content: str) -> None:
@@ -198,58 +199,90 @@ def symbol_name(name: str) -> str:
     return ident
 
 
+def palette_index(rgb: tuple[int, int, int], palette: list[tuple[int, int, int]]) -> int:
+    best_idx = 0
+    best_dist = 1 << 62
+    r0, g0, b0 = rgb
+    for idx, cand in enumerate(palette):
+        dr = r0 - cand[0]
+        dg = g0 - cand[1]
+        db = b0 - cand[2]
+        dist = dr * dr * 3 + dg * dg * 4 + db * db * 2
+        if dist < best_dist:
+            best_dist = dist
+            best_idx = idx
+    return best_idx
+
+
 def load_assets(palette: list[tuple[int, int, int]]) -> list[tuple[str, list[int]]]:
     TEXTURES_DIR.mkdir(parents=True, exist_ok=True)
     assets: list[tuple[str, list[int]]] = []
     for bmp_path in sorted(TEXTURES_DIR.glob("*.bmp")):
         name = bmp_path.stem
         pixels = read_bmp(bmp_path)
-        quantized = [rgb565(nearest_palette_color(px, palette)) for px in pixels]
-        assets.append((name, quantized))
+        indexed = [palette_index(px, palette) for px in pixels]
+        assets.append((name, indexed))
     return assets
 
 
-def write_generated(assets: list[tuple[str, list[int]]]) -> None:
+def build_blob(assets: list[tuple[str, list[int]]]) -> bytes:
+    blob = bytearray()
+    blob.extend(struct.pack("<HH", BLOB_MAGIC, len(assets)))
+    for name, indices in assets:
+        name_bytes = name.encode("ascii") + b"\0"
+        blob.extend(struct.pack("<H", len(name_bytes)))
+        blob.extend(name_bytes)
+        blob.extend(struct.pack("<H", len(indices)))
+        blob.extend(bytes(indices))
+    return bytes(blob)
+
+
+def bytes_lines(data: bytes, width: int = 16) -> list[str]:
+    lines: list[str] = []
+    for offset in range(0, len(data), width):
+        chunk = data[offset:offset + width]
+        lines.append("  " + ", ".join(f"0x{value:02X}" for value in chunk) + ",")
+    return lines
+
+
+def write_generated(palette: list[tuple[int, int, int]], assets: list[tuple[str, list[int]]]) -> None:
     header = """#pragma once
 
 #include "Textures.h"
 
 namespace TexturesGenerated {
 
-extern const Textures::Asset ASSETS[];
-extern const int ASSET_COUNT;
+extern const uint8_t PALETTE_RGB[Textures::PALETTE_SIZE * 3];
+extern const uint8_t BLOB[];
+extern const unsigned int BLOB_SIZE;
 
 }
 """
     write_text_if_changed(GENERATED_HEADER, header)
 
+    blob = build_blob(assets)
     lines: list[str] = [
         '#include "TexturesGenerated.h"',
         "",
         "namespace TexturesGenerated {",
         "",
+        "const uint8_t PALETTE_RGB[Textures::PALETTE_SIZE * 3] = {",
     ]
 
-    for name, pixels in assets:
-        symbol = symbol_name(name)
-        lines.append(f"static const uint16_t {symbol}[Textures::TEX_SIZE * Textures::TEX_SIZE] = {{")
-        for row in range(TEX_SIZE):
-            chunk = pixels[row * TEX_SIZE:(row + 1) * TEX_SIZE]
-            lines.append("  " + ", ".join(f"0x{value:04X}" for value in chunk) + ",")
-        lines.append("};")
-        lines.append("")
-
-    if assets:
-        lines.append("const Textures::Asset ASSETS[] = {")
-        for name, _ in assets:
-            lines.append(f'  {{"{name}", {symbol_name(name)}}},')
-        lines.append("};")
-        lines.append(f"const int ASSET_COUNT = {len(assets)};")
-    else:
-        lines.append("const Textures::Asset ASSETS[] = {")
-        lines.append('  {"", 0},')
-        lines.append("};")
-        lines.append("const int ASSET_COUNT = 0;")
+    palette_bytes = bytearray()
+    for r, g, b in palette:
+        palette_bytes.extend((r, g, b))
+    lines.extend(bytes_lines(bytes(palette_bytes), 12))
+    lines.extend([
+        "};",
+        "",
+        "const uint8_t BLOB[] = {",
+    ])
+    lines.extend(bytes_lines(blob))
+    lines.extend([
+        "};",
+        f"const unsigned int BLOB_SIZE = {len(blob)}u;",
+    ])
 
     lines.extend(["", "}"])
     write_text_if_changed(GENERATED_CPP, "\n".join(lines) + "\n")
@@ -258,7 +291,7 @@ extern const int ASSET_COUNT;
 def main() -> int:
     palette = read_palette_gpl(PALETTE_FILE)
     assets = load_assets(palette)
-    write_generated(assets)
+    write_generated(palette, assets)
     return 0
 
 
