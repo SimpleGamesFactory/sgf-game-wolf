@@ -896,6 +896,7 @@ void Wolf3DGame::renderFpsCounter() {
 }
 
 void Wolf3DGame::renderKeys() {
+  static constexpr int kPickupFloorOffsetDiv = 3;
   float invDet = 1.0f / (planeX * dirY - dirX * planeY);
   for (int mapY = 0; mapY < mapHeight; mapY++) {
     for (int mapX = 0; mapX < mapWidth; mapX++) {
@@ -919,26 +920,27 @@ void Wolf3DGame::renderKeys() {
       int spriteScreenX =
         static_cast<int>((static_cast<float>(RENDER_W) * 0.5f) * (1.0f + transformX / transformY));
       int spriteHeight = abs(static_cast<int>(static_cast<float>(RENDER_H) / transformY));
-      int spriteWidth = spriteHeight / 2;
+      int spriteWidth = spriteHeight;
       if (spriteWidth < 4) {
         spriteWidth = 4;
       }
 
-      int pickupDrop = spriteHeight / 3;
-      int rawDrawStartY = (-spriteHeight / 2) + (RENDER_H / 2) + pickupDrop;
-      int rawDrawEndY = (spriteHeight / 2) + (RENDER_H / 2) + pickupDrop;
+      int pickupFloorOffset = spriteHeight / kPickupFloorOffsetDiv;
+      int rawDrawEndY = (RENDER_H / 2) + (spriteHeight / 2) + pickupFloorOffset;
+      int rawDrawStartY = rawDrawEndY - spriteHeight + 1;
       int drawStartY = rawDrawStartY;
       int drawEndY = rawDrawEndY;
       drawStartY = Math::clamp(drawStartY, 0, RENDER_H - 1);
       drawEndY = Math::clamp(drawEndY, 0, RENDER_H - 1);
 
-      int drawStartX = spriteScreenX - spriteWidth / 2;
-      int drawEndX = spriteScreenX + spriteWidth / 2;
+      int rawDrawStartX = spriteScreenX - spriteWidth / 2;
+      int rawDrawEndX = spriteScreenX + spriteWidth / 2;
+      int drawStartX = rawDrawStartX;
+      int drawEndX = rawDrawEndX;
       drawStartX = Math::clamp(drawStartX, 0, RENDER_W - 1);
       drawEndX = Math::clamp(drawEndX, 0, RENDER_W - 1);
-      int texXStep = (Keys::TEX_SIZE << 16) / Math::clamp(spriteWidth, 1, RENDER_W);
-      int texXPos = ((drawStartX - (spriteScreenX - spriteWidth / 2)) * Keys::TEX_SIZE << 16) /
-                    Math::clamp(spriteWidth, 1, RENDER_W);
+      int texXStep = (Keys::TEX_SIZE << 16) / Math::clamp(spriteWidth, 1, 1 << 14);
+      int texXPos = (drawStartX - rawDrawStartX) * texXStep;
       uint16_t shadedTexture[Keys::TEX_SIZE * Keys::TEX_SIZE];
       for (int i = 0; i < Keys::TEX_SIZE * Keys::TEX_SIZE; i++) {
         uint16_t color565 = keyTexture[i];
@@ -954,9 +956,8 @@ void Wolf3DGame::renderKeys() {
         int texX = texXPos >> 16;
         texX = Math::clamp(texX, 0, Keys::TEX_SIZE - 1);
         texXPos += texXStep;
-        int texYStep = (Keys::TEX_SIZE << 16) / Math::clamp(spriteHeight, 1, RENDER_H);
-        int texYPos = ((drawStartY - rawDrawStartY) * Keys::TEX_SIZE << 16) /
-                      Math::clamp(spriteHeight, 1, RENDER_H);
+        int texYStep = (Keys::TEX_SIZE << 16) / Math::clamp(spriteHeight, 1, 1 << 14);
+        int texYPos = (drawStartY - rawDrawStartY) * texYStep;
 
         for (int y = drawStartY; y <= drawEndY; y++) {
           int texY = texYPos >> 16;
@@ -974,6 +975,7 @@ void Wolf3DGame::renderKeys() {
 }
 
 void Wolf3DGame::renderZombies(uint32_t nowMs) {
+  static constexpr int kZombieFloorOffsetDiv = 8;
   int order[Zombie::MAX_COUNT]{};
   float distances[Zombie::MAX_COUNT]{};
   int renderCount = 0;
@@ -1021,20 +1023,23 @@ void Wolf3DGame::renderZombies(uint32_t nowMs) {
       spriteWidth = 4;
     }
 
-      int drawStartY = (-spriteHeight / 2) + (RENDER_H / 2);
-    int drawEndY = (spriteHeight / 2) + (RENDER_H / 2);
+    int zombieFloorOffset = spriteHeight / kZombieFloorOffsetDiv;
+    int rawDrawEndY = (RENDER_H / 2) + (spriteHeight / 2) + zombieFloorOffset;
+    int rawDrawStartY = rawDrawEndY - spriteHeight + 1;
+    int drawStartY = rawDrawStartY;
+    int drawEndY = rawDrawEndY;
     drawStartY = Math::clamp(drawStartY, 0, RENDER_H - 1);
     drawEndY = Math::clamp(drawEndY, 0, RENDER_H - 1);
 
-    int drawStartX = spriteScreenX - spriteWidth / 2;
-    int drawEndX = spriteScreenX + spriteWidth / 2;
+    int rawDrawStartX = spriteScreenX - spriteWidth / 2;
+    int rawDrawEndX = spriteScreenX + spriteWidth / 2;
+    int drawStartX = rawDrawStartX;
+    int drawEndX = rawDrawEndX;
     drawStartX = Math::clamp(drawStartX, 0, RENDER_W - 1);
     drawEndX = Math::clamp(drawEndX, 0, RENDER_W - 1);
-    int texXStep = (Zombie::TEX_SIZE << 16) / Math::clamp(spriteWidth, 1, RENDER_W);
-    int texXPos = ((drawStartX - (spriteScreenX - spriteWidth / 2)) * Zombie::TEX_SIZE << 16) /
-                  Math::clamp(spriteWidth, 1, RENDER_W);
-    int texYStep = (Zombie::TEX_SIZE << 16) / Math::clamp(spriteHeight, 1, RENDER_H);
-    int rawDrawStartY = (-spriteHeight / 2) + (RENDER_H / 2);
+    int texXStep = (Zombie::TEX_SIZE << 16) / Math::clamp(spriteWidth, 1, 1 << 14);
+    int texXPos = (drawStartX - rawDrawStartX) * texXStep;
+    int texYStep = (Zombie::TEX_SIZE << 16) / Math::clamp(spriteHeight, 1, 1 << 14);
     uint16_t shadedTexture[Zombie::TEX_SIZE * Zombie::TEX_SIZE];
     for (int texY = 0; texY < Zombie::TEX_SIZE; texY++) {
       for (int texX = 0; texX < Zombie::TEX_SIZE; texX++) {
@@ -1053,8 +1058,7 @@ void Wolf3DGame::renderZombies(uint32_t nowMs) {
       int texX = texXPos >> 16;
       texX = Math::clamp(texX, 0, Zombie::TEX_SIZE - 1);
       texXPos += texXStep;
-      int texYPos = ((drawStartY - rawDrawStartY) * Zombie::TEX_SIZE << 16) /
-                    Math::clamp(spriteHeight, 1, RENDER_H);
+      int texYPos = (drawStartY - rawDrawStartY) * texYStep;
 
       for (int y = drawStartY; y <= drawEndY; y++) {
         int texY = texYPos >> 16;
