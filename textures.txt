@@ -21,10 +21,10 @@ map_char=I  code=wall_white    asset=wall_white      notes=BMP-backed, fallback 
 
 Doors
 -----
-map_char=D  code=door_plain    asset=-               notes=procedural only, Door.cpp
-map_char=1  code=door_red      asset=-               notes=procedural only, locked red, Door.cpp
-map_char=2  code=door_green    asset=-               notes=procedural only, locked green, Door.cpp
-map_char=3  code=door_blue     asset=-               notes=procedural only, locked blue, Door.cpp
+map_char=D  code=door_plain    asset=door_plain      notes=BMP-backed, fallback in Door.cpp
+map_char=1  code=door_red      asset=door_red        notes=BMP-backed, locked red, fallback in Door.cpp
+map_char=2  code=door_green    asset=door_green      notes=BMP-backed, locked green, fallback in Door.cpp
+map_char=3  code=door_blue     asset=door_blue       notes=BMP-backed, locked blue, fallback in Door.cpp
 
 Sprites
 -------

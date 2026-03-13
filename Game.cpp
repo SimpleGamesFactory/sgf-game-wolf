@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #if defined(ARDUINO_ARCH_ESP32)
 #include <esp_heap_caps.h>
 #endif
@@ -162,6 +163,20 @@ void Wolf3DGame::onSetup() {
       }
     }
   }
+  if (doorOpenAmounts == nullptr) {
+    const size_t doorBytes = sizeof(uint8_t) * MAP_MAX_W * MAP_MAX_H;
+#if defined(ARDUINO_ARCH_ESP32)
+    doorOpenAmounts = static_cast<uint8_t*>(
+      heap_caps_malloc(doorBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+#else
+    doorOpenAmounts = static_cast<uint8_t*>(malloc(doorBytes));
+#endif
+    if (doorOpenAmounts == nullptr) {
+      while (true) {
+        delay(1000);
+      }
+    }
+  }
 #endif
 #if WOLF_DYNAMIC_FRAMEBUFFER
   const size_t frameBytes = sizeof(uint16_t) * RENDER_W * RENDER_H;
@@ -248,6 +263,8 @@ void Wolf3DGame::onPhysics(float delta) {
   updateInput(delta);
   profiler.add(WolfProfiler::Slot::Input, micros() - sectionStartUs);
 
+  updateDoors(delta);
+
   sectionStartUs = micros();
   updateZombies(delta);
   profiler.add(WolfProfiler::Slot::ZombieUpdate, micros() - sectionStartUs);
@@ -281,6 +298,8 @@ void Wolf3DGame::onProcess(float delta) {
 
 void Wolf3DGame::resetMap() {
   Map::load(map, doorOpenBits, mapWidth, mapHeight, spawn);
+  memset(doorOpenAmounts, 0, sizeof(uint8_t) * MAP_MAX_W * MAP_MAX_H);
+  memset(doorUnlockedBits, 0, sizeof(doorUnlockedBits));
   Zombie::loadSpawns(zombies, zombieCount, MapLayout::E1M1);
 }
 
@@ -307,7 +326,7 @@ void Wolf3DGame::resetPlayerPose() {
 Zombie::WorldView Wolf3DGame::makeZombieWorldView(uint32_t nowMs, float delta) const {
   Zombie::WorldView world;
   world.map = &map[0][0];
-  world.doorOpenBits = doorOpenBits;
+  world.doorOpenAmounts = doorOpenAmounts;
   world.mapStride = MAP_MAX_W;
   world.mapWidth = mapWidth;
   world.mapHeight = mapHeight;
@@ -325,12 +344,27 @@ bool Wolf3DGame::hasKey(KeyColor color) const {
   return (keysOwned & Keys::bitFor(color)) != 0;
 }
 
+uint8_t Wolf3DGame::doorOpenAmountAt(int cellX, int cellY) const {
+  if (cellX < 0 || cellX >= MAP_MAX_W || cellY < 0 || cellY >= MAP_MAX_H || doorOpenAmounts == nullptr) {
+    return Door::OPEN_AMOUNT_CLOSED;
+  }
+  return doorOpenAmounts[cellY * MAP_MAX_W + cellX];
+}
+
 bool Wolf3DGame::isDoorOpen(int cellX, int cellY) const {
   if (cellX < 0 || cellX >= MAP_MAX_W || cellY < 0 || cellY >= MAP_MAX_H) {
     return false;
   }
   int index = cellY * MAP_MAX_W + cellX;
   return (doorOpenBits[index >> 3] & (1u << (index & 7))) != 0;
+}
+
+bool Wolf3DGame::isDoorUnlocked(int cellX, int cellY) const {
+  if (cellX < 0 || cellX >= MAP_MAX_W || cellY < 0 || cellY >= MAP_MAX_H) {
+    return false;
+  }
+  int index = cellY * MAP_MAX_W + cellX;
+  return (doorUnlockedBits[index >> 3] & (1u << (index & 7))) != 0;
 }
 
 void Wolf3DGame::setDoorOpen(int cellX, int cellY, bool open) {
@@ -346,6 +380,19 @@ void Wolf3DGame::setDoorOpen(int cellX, int cellY, bool open) {
   }
 }
 
+void Wolf3DGame::setDoorUnlocked(int cellX, int cellY, bool unlocked) {
+  if (cellX < 0 || cellX >= MAP_MAX_W || cellY < 0 || cellY >= MAP_MAX_H) {
+    return;
+  }
+  int index = cellY * MAP_MAX_W + cellX;
+  uint8_t mask = static_cast<uint8_t>(1u << (index & 7));
+  if (unlocked) {
+    doorUnlockedBits[index >> 3] |= mask;
+  } else {
+    doorUnlockedBits[index >> 3] &= static_cast<uint8_t>(~mask);
+  }
+}
+
 bool Wolf3DGame::wallAt(int cellX, int cellY) const {
   if (cellX < 0 || cellX >= mapWidth || cellY < 0 || cellY >= mapHeight) {
     return true;
@@ -358,9 +405,41 @@ bool Wolf3DGame::wallAt(int cellX, int cellY) const {
     return false;
   }
   if (Door::isTile(tile)) {
-    return !Door::isPassable(isDoorOpen(cellX, cellY));
+    return !Door::isPassable(doorOpenAmountAt(cellX, cellY));
   }
   return true;
+}
+
+void Wolf3DGame::updateDoors(float delta) {
+  if (doorOpenAmounts == nullptr) {
+    return;
+  }
+  int step = static_cast<int>(Door::OPEN_SPEED_PER_SEC * 255.0f * delta);
+  if (step < 1) {
+    step = 1;
+  }
+  for (int y = 0; y < mapHeight; y++) {
+    for (int x = 0; x < mapWidth; x++) {
+      if (!Door::isTile(map[y][x])) {
+        continue;
+      }
+      int index = y * MAP_MAX_W + x;
+      int target = isDoorOpen(x, y) ? Door::OPEN_AMOUNT_OPEN : Door::OPEN_AMOUNT_CLOSED;
+      int current = doorOpenAmounts[index];
+      if (current < target) {
+        current += step;
+        if (current > target) {
+          current = target;
+        }
+      } else if (current > target) {
+        current -= step;
+        if (current < target) {
+          current = target;
+        }
+      }
+      doorOpenAmounts[index] = static_cast<uint8_t>(current);
+    }
+  }
 }
 
 bool Wolf3DGame::blockedAt(float testX, float testY) const {
@@ -444,13 +523,13 @@ bool Wolf3DGame::toggleDoorAhead() {
     }
   } else {
     KeyColor required = Door::requiredKey(map[cellY][cellX]);
-    if (!hasKey(required)) {
+    if (required != KeyColor::None && !isDoorUnlocked(cellX, cellY) && !hasKey(required)) {
       return true;
     }
-    if (required != KeyColor::None) {
+    if (required != KeyColor::None && !isDoorUnlocked(cellX, cellY)) {
       keysOwned &= static_cast<uint8_t>(~Keys::bitFor(required));
       hud.setKeys(keysOwned);
-      map[cellY][cellX] = 'D';
+      setDoorUnlocked(cellX, cellY, true);
     }
     setDoorOpen(cellX, cellY, true);
   }
@@ -689,7 +768,7 @@ void Wolf3DGame::renderFrame() {
       RENDER_W,
       RENDER_H,
       &map[0][0],
-      doorOpenBits,
+      doorOpenAmounts,
       MAP_MAX_W,
       mapWidth,
       mapHeight,
@@ -879,6 +958,7 @@ void Wolf3DGame::renderWorld() {
 
     bool hit = false;
     bool side = false;
+    uint8_t tile = 1;
     while (!hit) {
       if (sideDistX < sideDistY) {
         sideDistX += deltaDistX;
@@ -889,9 +969,53 @@ void Wolf3DGame::renderWorld() {
         mapY += stepY;
         side = true;
       }
-      if (wallAt(mapX, mapY)) {
+
+      if (mapX < 0 || mapX >= mapWidth || mapY < 0 || mapY >= mapHeight) {
+        tile = 1;
         hit = true;
+        continue;
       }
+
+      tile = map[mapY][mapX];
+      if (tile == 0 || Keys::isPickup(tile)) {
+        continue;
+      }
+
+      if (Door::isTile(tile)) {
+        float testPerpWallDist;
+        if (!side) {
+          testPerpWallDist =
+            (static_cast<float>(mapX) - playerX + (1.0f - static_cast<float>(stepX)) * 0.5f) /
+            rayDirX;
+        } else {
+          testPerpWallDist =
+            (static_cast<float>(mapY) - playerY + (1.0f - static_cast<float>(stepY)) * 0.5f) /
+            rayDirY;
+        }
+        if (testPerpWallDist < 0.001f) {
+          testPerpWallDist = 0.001f;
+        }
+
+        float testWallX;
+        if (!side) {
+          testWallX = playerY + testPerpWallDist * rayDirY;
+        } else {
+          testWallX = playerX + testPerpWallDist * rayDirX;
+        }
+        testWallX -= floorf(testWallX);
+
+        int testTexX = static_cast<int>(testWallX * static_cast<float>(Walls::TEX_SIZE));
+        testTexX = Math::clamp(testTexX, 0, Walls::TEX_SIZE - 1);
+        if ((!side && rayDirX < 0.0f) || (side && rayDirY > 0.0f)) {
+          testTexX = Walls::TEX_SIZE - testTexX - 1;
+        }
+
+        int shiftedDoorTexX = Door::shiftedTexX(testTexX, doorOpenAmountAt(mapX, mapY));
+        if (shiftedDoorTexX < 0 || shiftedDoorTexX >= Door::TEX_SIZE) {
+          continue;
+        }
+      }
+      hit = true;
     }
 
     float perpWallDist;
@@ -919,11 +1043,6 @@ void Wolf3DGame::renderWorld() {
       drawEnd = RENDER_H - 1;
     }
 
-    uint8_t tile = 1;
-    if (mapX >= 0 && mapX < mapWidth && mapY >= 0 && mapY < mapHeight) {
-      tile = map[mapY][mapX];
-    }
-
     float wallX;
     if (!side) {
       wallX = playerY + perpWallDist * rayDirY;
@@ -934,12 +1053,23 @@ void Wolf3DGame::renderWorld() {
 
     int texX = static_cast<int>(wallX * static_cast<float>(Walls::TEX_SIZE));
     texX = Math::clamp(texX, 0, Walls::TEX_SIZE - 1);
-    if ((!side && rayDirX > 0.0f) || (side && rayDirY < 0.0f)) {
+    if ((!side && rayDirX < 0.0f) || (side && rayDirY > 0.0f)) {
       texX = Walls::TEX_SIZE - texX - 1;
     }
 
+    uint8_t doorOpenAmount = Door::isTile(tile) ? doorOpenAmountAt(mapX, mapY) : 0;
     wallDepth[x] = perpWallDist;
-    renderColumn(x, lineHeight, rawDrawStart, drawStart, drawEnd, tile, texX, perpWallDist, side);
+    renderColumn(
+      x,
+      lineHeight,
+      rawDrawStart,
+      drawStart,
+      drawEnd,
+      tile,
+      texX,
+      perpWallDist,
+      side,
+      doorOpenAmount);
   }
 }
 
@@ -1055,7 +1185,8 @@ void Wolf3DGame::renderColumn(
   uint8_t tile,
   int texX,
   float distance,
-  bool side
+  bool side,
+  uint8_t doorOpenAmount
 ) {
   uint16_t* fb = frameBuffer;
   if (x < 0 || x >= RENDER_W) {
@@ -1066,8 +1197,26 @@ void Wolf3DGame::renderColumn(
     return;
   }
   uint16_t shadedColumn[Walls::TEX_SIZE];
+  bool opaqueColumn[Walls::TEX_SIZE];
+  bool isDoor = Door::isTile(tile);
+  int shiftedTexX = texX;
+  if (isDoor && doorOpenAmount > 0) {
+    shiftedTexX = Door::shiftedTexX(texX, doorOpenAmount);
+  }
   for (int texY = 0; texY < Walls::TEX_SIZE; texY++) {
-    shadedColumn[texY] = shadeColor(Walls::texel(tile, texX, texY), distance, side);
+    uint16_t texel565 = 0;
+    bool opaque = true;
+    if (isDoor) {
+      if (shiftedTexX >= 0 && shiftedTexX < Door::TEX_SIZE) {
+        texel565 = Door::texel(tile, shiftedTexX, texY);
+      } else {
+        opaque = false;
+      }
+    } else {
+      texel565 = Walls::texel(tile, texX, texY);
+    }
+    opaqueColumn[texY] = opaque;
+    shadedColumn[texY] = opaque ? shadeColor(texel565, distance, side) : 0;
   }
   int texStep = (Walls::TEX_SIZE << 16) / Math::clamp(lineHeight, 1, 1 << 14);
   int texPos = (drawStart - rawDrawStart) * texStep;
@@ -1078,6 +1227,10 @@ void Wolf3DGame::renderColumn(
     }
     if (texY >= Walls::TEX_SIZE) {
       texY = Walls::TEX_SIZE - 1;
+    }
+    if (isDoor && !opaqueColumn[texY]) {
+      texPos += texStep;
+      continue;
     }
     fb[y * RENDER_W + x] = shadedColumn[texY];
     texPos += texStep;

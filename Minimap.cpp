@@ -45,17 +45,9 @@ void drawRect(
   }
 }
 
-bool doorIsOpen(const uint8_t* doorOpenBits, int mapStride, int cellX, int cellY) {
-  if (!doorOpenBits) {
-    return false;
-  }
-  int index = cellY * mapStride + cellX;
-  return (doorOpenBits[index >> 3] & (1u << (index & 7))) != 0;
-}
-
-uint16_t tileColor(uint8_t tile, bool isOpen) {
+uint16_t tileColor(uint8_t tile, uint8_t openAmount) {
   if (Door::isTile(tile)) {
-    return Door::minimapColor(tile, isOpen);
+    return Door::minimapColor(tile, openAmount);
   }
   switch (tile) {
     case 1: return Color565::rgb(140, 66, 58);
@@ -78,7 +70,7 @@ void Minimap::render(
   int width,
   int height,
   const uint8_t* map,
-  const uint8_t* doorOpenBits,
+  const uint8_t* doorOpenAmounts,
   int mapStride,
   int mapW,
   int mapH,
@@ -132,10 +124,13 @@ void Minimap::render(
   for (int y = 0; y < mapH; y++) {
     for (int x = 0; x < mapW; x++) {
       uint8_t tile = map[y * mapStride + x];
-      bool isOpen = doorIsOpen(doorOpenBits, mapStride, x, y);
+      uint8_t openAmount = 0;
+      if (doorOpenAmounts != nullptr) {
+        openAmount = doorOpenAmounts[y * mapStride + x];
+      }
       bool isKey = Keys::isPickup(tile);
       uint16_t color565 =
-        (tile && !isKey) ? tileColor(tile, isOpen) : Color565::rgb(18, 22, 26);
+        (tile && !isKey) ? tileColor(tile, openAmount) : Color565::rgb(18, 22, 26);
       drawRect(
         buffer,
         width,

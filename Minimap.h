@@ -9,7 +9,7 @@ public:
     int width,
     int height,
     const uint8_t* map,
-    const uint8_t* doorOpenBits,
+    const uint8_t* doorOpenAmounts,
     int mapStride,
     int mapW,
     int mapH,

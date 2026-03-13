@@ -206,11 +206,15 @@ private:
   Hud hud;
 #if WOLF_HEAP_COLD_BUFFERS
   uint8_t (*map)[MAP_MAX_W] = nullptr;
+  uint8_t* doorOpenAmounts = nullptr;
 #else
   uint8_t mapStorage[MAP_MAX_H][MAP_MAX_W]{};
   uint8_t (*map)[MAP_MAX_W] = mapStorage;
+  uint8_t doorOpenAmountStorage[MAP_MAX_H * MAP_MAX_W]{};
+  uint8_t* doorOpenAmounts = doorOpenAmountStorage;
 #endif
   uint8_t doorOpenBits[Map::DOOR_OPEN_BYTES]{};
+  uint8_t doorUnlockedBits[Map::DOOR_OPEN_BYTES]{};
   int mapWidth = 0;
   int mapHeight = 0;
   Map::Spawn spawn;
@@ -225,8 +229,12 @@ private:
   void resetPlayerPose();
   Zombie::WorldView makeZombieWorldView(uint32_t nowMs, float delta) const;
   bool hasKey(KeyColor color) const;
+  uint8_t doorOpenAmountAt(int cellX, int cellY) const;
   bool isDoorOpen(int cellX, int cellY) const;
+  bool isDoorUnlocked(int cellX, int cellY) const;
   void setDoorOpen(int cellX, int cellY, bool open);
+  void setDoorUnlocked(int cellX, int cellY, bool unlocked);
+  void updateDoors(float delta);
   bool wallAt(int cellX, int cellY) const;
   bool blockedAt(float testX, float testY) const;
   bool attemptMove(float nextX, float nextY);
@@ -262,7 +270,8 @@ private:
     uint8_t tile,
     int texX,
     float distance,
-    bool side);
+    bool side,
+    uint8_t doorOpenAmount);
   void fillRect(int x0, int y0, int w, int h, uint16_t color565);
   void putPixel(int x, int y, uint16_t color565);
   uint16_t shadeColor(uint16_t color565, float distance, bool side) const;

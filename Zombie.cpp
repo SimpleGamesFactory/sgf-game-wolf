@@ -27,11 +27,11 @@ uint16_t applyAttackTint(uint16_t color565) {
 }
 
 bool doorIsOpen(const Zombie::WorldView& world, int cellX, int cellY) {
-  if (!world.doorOpenBits) {
+  if (!world.doorOpenAmounts) {
     return false;
   }
   int index = cellY * world.mapStride + cellX;
-  return (world.doorOpenBits[index >> 3] & (1u << (index & 7))) != 0;
+  return Door::isPassable(world.doorOpenAmounts[index]);
 }
 
 bool wallAt(const Zombie::WorldView& world, int cellX, int cellY) {

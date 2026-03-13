@@ -1,6 +1,7 @@
 #include "Door.h"
 
 #include "SGF/Color565.h"
+#include "Textures.h"
 
 bool Door::isTile(uint8_t tile) {
   return tile == 'D' || tile == '1' || tile == '2' || tile == '3';
@@ -15,12 +16,12 @@ KeyColor Door::requiredKey(uint8_t tile) {
   }
 }
 
-bool Door::isPassable(bool open) {
-  return open;
+bool Door::isPassable(uint8_t openAmount) {
+  return openAmount >= PASSABLE_THRESHOLD;
 }
 
-uint16_t Door::minimapColor(uint8_t tile, bool open) {
-  if (open) {
+uint16_t Door::minimapColor(uint8_t tile, uint8_t openAmount) {
+  if (openAmount > 0) {
     KeyColor key = requiredKey(tile);
     if (key != KeyColor::None) {
       return Color565::lighten(Keys::color565(key));
@@ -34,7 +35,22 @@ uint16_t Door::minimapColor(uint8_t tile, bool open) {
   return Color565::rgb(142, 108, 56);
 }
 
+const char* Door::textureName(uint8_t tile) {
+  switch (tile) {
+    case '1': return "door_red";
+    case '2': return "door_green";
+    case '3': return "door_blue";
+    default: return "door_plain";
+  }
+}
+
+int Door::shiftedTexX(int texX, uint8_t openAmount) {
+  int shift = (static_cast<int>(openAmount) * (TEX_SIZE + 1)) / 256;
+  return texX - shift;
+}
+
 uint16_t Door::texel(uint8_t tile, int texX, int texY) {
+  uint16_t fallback = 0;
   uint16_t base = Color565::rgb(152, 112, 62);
   uint16_t dark = Color565::darken(base);
   uint16_t light = Color565::lighten(base);
@@ -49,19 +65,17 @@ uint16_t Door::texel(uint8_t tile, int texX, int texY) {
   bool handle = (texX == 12 && texY == 8);
 
   if (edge) {
-    return dark;
+    fallback = dark;
+  } else if (handle) {
+    fallback = metalLight;
+  } else if (lockPlate) {
+    fallback = metal;
+  } else if (brace) {
+    fallback = dark;
+  } else if (plank) {
+    fallback = light;
+  } else {
+    fallback = base;
   }
-  if (handle) {
-    return metalLight;
-  }
-  if (lockPlate) {
-    return metal;
-  }
-  if (brace) {
-    return dark;
-  }
-  if (plank) {
-    return light;
-  }
-  return base;
+  return Textures::texel(textureName(tile), texX, texY, fallback);
 }
