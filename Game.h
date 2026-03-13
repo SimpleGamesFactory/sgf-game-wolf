@@ -3,11 +3,11 @@
 #include <stdint.h>
 
 #ifndef WOLF_VIEWPORT_W
-#define WOLF_VIEWPORT_W 200
+#define WOLF_VIEWPORT_W 240
 #endif
 
 #ifndef WOLF_VIEWPORT_H
-#define WOLF_VIEWPORT_H 140
+#define WOLF_VIEWPORT_H 180
 #endif
 
 #ifndef WOLF_SIMPLE_FLOOR
