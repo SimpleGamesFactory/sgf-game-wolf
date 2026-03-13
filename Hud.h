@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+#ifndef WOLF_HEAP_COLD_BUFFERS
+#define WOLF_HEAP_COLD_BUFFERS 1
+#endif
+
 #include "SGF/DirtyRects.h"
 #include "SGF/IRenderTarget.h"
 
@@ -44,7 +48,12 @@ public:
 
 private:
   DirtyRects dirty;
-  uint8_t buffer[MAX_SCREEN_W * HUD_H]{};
+#if WOLF_HEAP_COLD_BUFFERS
+  uint8_t* buffer = nullptr;
+#else
+  uint8_t bufferStorage[MAX_SCREEN_W * HUD_H]{};
+  uint8_t* buffer = bufferStorage;
+#endif
   int screenW = 0;
   int worldScreenH = 0;
   int lives = 3;

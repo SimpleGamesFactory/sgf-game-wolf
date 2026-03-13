@@ -13,6 +13,14 @@ GENERATED_CPP = PROJECT_DIR / "TexturesGenerated.cpp"
 TEX_SIZE = 16
 
 
+def write_text_if_changed(path: Path, content: str) -> None:
+    if path.exists():
+        existing = path.read_text(encoding="ascii")
+        if existing == content:
+            return
+    path.write_text(content, encoding="ascii")
+
+
 def lerp(a: int, b: int, step: int, count: int) -> int:
     if count <= 1:
         return a
@@ -58,7 +66,7 @@ def write_palette_gpl(palette: list[tuple[int, int, int]]) -> None:
     ]
     for idx, (r, g, b) in enumerate(palette):
         lines.append(f"{r:3d} {g:3d} {b:3d} C{idx:03d}")
-    PALETTE_FILE.write_text("\n".join(lines) + "\n", encoding="ascii")
+    write_text_if_changed(PALETTE_FILE, "\n".join(lines) + "\n")
 
 
 def read_palette_gpl(path: Path) -> list[tuple[int, int, int]]:
@@ -213,7 +221,7 @@ extern const int ASSET_COUNT;
 
 }
 """
-    GENERATED_HEADER.write_text(header, encoding="ascii")
+    write_text_if_changed(GENERATED_HEADER, header)
 
     lines: list[str] = [
         '#include "TexturesGenerated.h"',
@@ -244,7 +252,7 @@ extern const int ASSET_COUNT;
         lines.append("const int ASSET_COUNT = 0;")
 
     lines.extend(["", "}"])
-    GENERATED_CPP.write_text("\n".join(lines) + "\n", encoding="ascii")
+    write_text_if_changed(GENERATED_CPP, "\n".join(lines) + "\n")
 
 
 def main() -> int:

@@ -1,6 +1,10 @@
 #include "Hud.h"
 
+#include <stdlib.h>
 #include <stdio.h>
+#if defined(ARDUINO_ARCH_ESP32)
+#include <esp_heap_caps.h>
+#endif
 
 #include "Keys.h"
 #include "SGF/Color565.h"
@@ -63,6 +67,20 @@ uint16_t unpackRgb332(uint8_t packed) {
 void Hud::begin(int width, int worldHeight) {
   screenW = width;
   worldScreenH = worldHeight;
+#if WOLF_HEAP_COLD_BUFFERS
+  if (buffer == nullptr) {
+    const size_t bufferBytes = static_cast<size_t>(screenW) * HUD_H;
+#if defined(ARDUINO_ARCH_ESP32)
+    buffer = static_cast<uint8_t*>(
+      heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+#else
+    buffer = static_cast<uint8_t*>(malloc(bufferBytes));
+#endif
+    if (buffer == nullptr) {
+      abort();
+    }
+  }
+#endif
   invalidate();
 }
 

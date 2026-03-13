@@ -4,6 +4,9 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#if defined(ARDUINO_ARCH_ESP32)
+#include <esp_heap_caps.h>
+#endif
 
 #include "Door.h"
 #include "FloorRenderer.h"
@@ -144,6 +147,38 @@ void Wolf3DGame::onSetup() {
       delay(1000);
     }
   }
+#if WOLF_HEAP_COLD_BUFFERS
+  if (map == nullptr) {
+    const size_t mapBytes = sizeof(uint8_t) * MAP_MAX_W * MAP_MAX_H;
+#if defined(ARDUINO_ARCH_ESP32)
+    map = static_cast<uint8_t (*)[MAP_MAX_W]>(
+      heap_caps_malloc(mapBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+#else
+    map = static_cast<uint8_t (*)[MAP_MAX_W]>(malloc(mapBytes));
+#endif
+    if (map == nullptr) {
+      while (true) {
+        delay(1000);
+      }
+    }
+  }
+#endif
+#if WOLF_DYNAMIC_FRAMEBUFFER
+  const size_t frameBytes = sizeof(uint16_t) * RENDER_W * RENDER_H;
+#if defined(ARDUINO_ARCH_ESP32)
+  frameBuffer = static_cast<uint16_t*>(heap_caps_aligned_alloc(
+    DYNAMIC_FRAMEBUFFER_ALIGNMENT,
+    frameBytes,
+    MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT | MALLOC_CAP_CACHE_ALIGNED));
+#else
+  frameBuffer = static_cast<uint16_t*>(malloc(frameBytes));
+#endif
+  if (frameBuffer == nullptr) {
+    while (true) {
+      delay(1000);
+    }
+  }
+#endif
   const uint16_t viewportBg = Color565::rgb(4, 5, 8);
   if (VIEWPORT_Y > 0) {
     screen.fillRect565(0, 0, screenW, VIEWPORT_Y, viewportBg);
@@ -670,6 +705,7 @@ void Wolf3DGame::renderFrame() {
 }
 
 void Wolf3DGame::presentFrame() {
+  uint16_t* fb = frameBuffer;
   uint32_t nowMs = millis();
   uint8_t hitFlashStrength = damageFlashStrength(nowMs, damageFlashUntilMs, DAMAGE_FLASH_MS);
   uint8_t muzzleFlashStrength = shotFlashStrength(nowMs, shotUntilMs, WEAPON_FLASH_MS);
@@ -677,7 +713,9 @@ void Wolf3DGame::presentFrame() {
   const bool preSwappedStreamViewport =
     streamViewport && renderTarget.supportsPreSwappedBlit565Stream();
   const bool queuedPreSwappedStreamViewport =
-    preSwappedStreamViewport && renderTarget.supportsQueuedPreSwappedBlit565Stream();
+    preSwappedStreamViewport &&
+    UPSCALE_BUFFER_COUNT > 1 &&
+    renderTarget.supportsQueuedPreSwappedBlit565Stream();
   int queuedChunks = 0;
   int chunkIndex = 0;
   if (streamViewport) {
@@ -693,9 +731,7 @@ void Wolf3DGame::presentFrame() {
     uint16_t* activeUpscaleBuffer = upscaleBuffers[chunkIndex % UPSCALE_BUFFER_COUNT];
     chunkIndex++;
     for (int localY = 0; localY < srcRows; localY++) {
-      const uint16_t* src = &frameBuffer[(srcY0 + localY) * RENDER_W];
-      uint16_t* dstRow0 = &activeUpscaleBuffer[(localY * UPSCALE) * VIEWPORT_W];
-      uint16_t* dstRow1 = dstRow0 + VIEWPORT_W;
+      const uint16_t* src = &fb[(srcY0 + localY) * RENDER_W];
       if (hitFlashStrength == 0 && muzzleFlashStrength == 0) {
         for (int x = 0; x < RENDER_W; x++) {
           uint16_t color565 = src[x];
@@ -703,10 +739,13 @@ void Wolf3DGame::presentFrame() {
             color565 = Color565::bswap(color565);
           }
           int dstX = x * UPSCALE;
-          dstRow0[dstX] = color565;
-          dstRow0[dstX + 1] = color565;
-          dstRow1[dstX] = color565;
-          dstRow1[dstX + 1] = color565;
+          for (int copyY = 0; copyY < UPSCALE; copyY++) {
+            uint16_t* dstRow =
+              &activeUpscaleBuffer[(localY * UPSCALE + copyY) * VIEWPORT_W];
+            for (int copyX = 0; copyX < UPSCALE; copyX++) {
+              dstRow[dstX + copyX] = color565;
+            }
+          }
         }
       } else {
         for (int x = 0; x < RENDER_W; x++) {
@@ -721,10 +760,13 @@ void Wolf3DGame::presentFrame() {
             color565 = Color565::bswap(color565);
           }
           int dstX = x * UPSCALE;
-          dstRow0[dstX] = color565;
-          dstRow0[dstX + 1] = color565;
-          dstRow1[dstX] = color565;
-          dstRow1[dstX + 1] = color565;
+          for (int copyY = 0; copyY < UPSCALE; copyY++) {
+            uint16_t* dstRow =
+              &activeUpscaleBuffer[(localY * UPSCALE + copyY) * VIEWPORT_W];
+            for (int copyX = 0; copyX < UPSCALE; copyX++) {
+              dstRow[dstX + copyX] = color565;
+            }
+          }
         }
       }
     }
@@ -751,6 +793,7 @@ void Wolf3DGame::presentFrame() {
 }
 
 void Wolf3DGame::clearFrame() {
+  uint16_t* fb = frameBuffer;
   int horizon = Math::clamp((RENDER_H / 2) + bobOffsetY(), 1, RENDER_H - 1);
   for (int y = 0; y < RENDER_H; y++) {
     bool isSky = y < horizon;
@@ -778,7 +821,7 @@ void Wolf3DGame::clearFrame() {
       color565 = Color565::rgb(r, g, b);
     }
 
-    uint16_t* row = &frameBuffer[y * RENDER_W];
+    uint16_t* row = &fb[y * RENDER_W];
     for (int x = 0; x < RENDER_W; x++) {
       row[x] = color565;
     }
@@ -1014,6 +1057,7 @@ void Wolf3DGame::renderColumn(
   float distance,
   bool side
 ) {
+  uint16_t* fb = frameBuffer;
   if (x < 0 || x >= RENDER_W) {
     return;
   }
@@ -1035,16 +1079,17 @@ void Wolf3DGame::renderColumn(
     if (texY >= Walls::TEX_SIZE) {
       texY = Walls::TEX_SIZE - 1;
     }
-    frameBuffer[y * RENDER_W + x] = shadedColumn[texY];
+    fb[y * RENDER_W + x] = shadedColumn[texY];
     texPos += texStep;
   }
 }
 
 void Wolf3DGame::putPixel(int x, int y, uint16_t color565) {
+  uint16_t* fb = frameBuffer;
   if (x < 0 || x >= RENDER_W || y < 0 || y >= RENDER_H) {
     return;
   }
-  frameBuffer[y * RENDER_W + x] = color565;
+  fb[y * RENDER_W + x] = color565;
 }
 
 void Wolf3DGame::fillRect(int x0, int y0, int w, int h, uint16_t color565) {
@@ -1060,7 +1105,7 @@ void Wolf3DGame::fillRect(int x0, int y0, int w, int h, uint16_t color565) {
 
 uint16_t Wolf3DGame::shadeColor(uint16_t color565, float distance, bool side) const {
   float brightness = 1.0f / (1.0f + distance * 0.18f);
-  if (side) {
+  if (SIDE_SHADE && side) {
     brightness *= 0.72f;
   }
   brightness = Math::clamp(brightness, 0.18f, 1.0f);

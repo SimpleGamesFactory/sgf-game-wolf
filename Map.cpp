@@ -3,8 +3,8 @@
 #include "Zombie.h"
 
 void Map::load(
-  uint8_t (&tiles)[MAX_HEIGHT][MAX_WIDTH],
-  uint8_t (&doorOpenBits)[DOOR_OPEN_BYTES],
+  uint8_t (*tiles)[MAX_WIDTH],
+  uint8_t* doorOpenBits,
   int& width,
   int& height,
   Spawn& spawn

@@ -11,6 +11,10 @@
 #define SGF_ESP32_ST7789_240X240_SPI_HZ 40000000u
 #endif
 
+#ifndef SGF_ESP32_ST7789_240X240_USE_DMA_BUS
+#define SGF_ESP32_ST7789_240X240_USE_DMA_BUS 1
+#endif
+
 #include "SGF.h"
 #include "SGFHardwarePresets.h"
 #include "Game.h"

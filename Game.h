@@ -22,6 +22,30 @@
 #define WOLF_PLAYER_RADIUS 0.28f
 #endif
 
+#ifndef WOLF_SIDE_SHADE
+#define WOLF_SIDE_SHADE 0
+#endif
+
+#ifndef WOLF_UPSCALE
+#define WOLF_UPSCALE 2
+#endif
+
+#ifndef WOLF_UPSCALE_BUFFER_COUNT
+#define WOLF_UPSCALE_BUFFER_COUNT 2
+#endif
+
+#ifndef WOLF_DYNAMIC_FRAMEBUFFER
+#define WOLF_DYNAMIC_FRAMEBUFFER 1
+#endif
+
+#ifndef WOLF_DYNAMIC_FRAMEBUFFER_ALIGNMENT
+#define WOLF_DYNAMIC_FRAMEBUFFER_ALIGNMENT 32
+#endif
+
+#ifndef WOLF_HEAP_COLD_BUFFERS
+#define WOLF_HEAP_COLD_BUFFERS 1
+#endif
+
 #include "SGF/ActionState.h"
 #include "SGF/IFillRect.h"
 #include "SGF/Font5x7.h"
@@ -52,7 +76,7 @@ public:
 
 private:
   static constexpr uint32_t FRAME_DEFAULT_STEP_US = 16666u;
-  static constexpr uint32_t FRAME_MAX_STEP_US = 33333u;
+  static constexpr uint32_t FRAME_MAX_STEP_US = 100000u;
   static constexpr int MAX_SCREEN_W = 240;
   static constexpr int MAX_SCREEN_H = 240;
   static constexpr int HUD_H = 40;
@@ -61,12 +85,23 @@ private:
   static constexpr int VIEWPORT_H = WOLF_VIEWPORT_H;
   static constexpr int VIEWPORT_X = (MAX_SCREEN_W - VIEWPORT_W) / 2;
   static constexpr int VIEWPORT_Y = (WORLD_AREA_H - VIEWPORT_H) / 2;
-  static constexpr int UPSCALE = 2;
+  static constexpr int UPSCALE = WOLF_UPSCALE;
+  static constexpr size_t DYNAMIC_FRAMEBUFFER_ALIGNMENT = WOLF_DYNAMIC_FRAMEBUFFER_ALIGNMENT;
   static constexpr int UPSCALE_CHUNK_SRC_ROWS = 3;
-  static constexpr int UPSCALE_BUFFER_COUNT = 2;
+  static constexpr int UPSCALE_BUFFER_COUNT = WOLF_UPSCALE_BUFFER_COUNT;
   static constexpr bool SIMPLE_FLOOR = WOLF_SIMPLE_FLOOR != 0;
   static constexpr int RENDER_W = VIEWPORT_W / UPSCALE;
   static constexpr int RENDER_H = VIEWPORT_H / UPSCALE;
+  static_assert(UPSCALE >= 1 && UPSCALE <= 4, "WOLF_UPSCALE must be 1..4");
+  static_assert(
+    DYNAMIC_FRAMEBUFFER_ALIGNMENT >= sizeof(void*) &&
+      (DYNAMIC_FRAMEBUFFER_ALIGNMENT & (DYNAMIC_FRAMEBUFFER_ALIGNMENT - 1u)) == 0u,
+    "WOLF_DYNAMIC_FRAMEBUFFER_ALIGNMENT must be a power of two and >= sizeof(void*)");
+  static_assert(
+    UPSCALE_BUFFER_COUNT >= 1 && UPSCALE_BUFFER_COUNT <= 4,
+    "WOLF_UPSCALE_BUFFER_COUNT must be 1..4");
+  static_assert((VIEWPORT_W % UPSCALE) == 0, "WOLF_VIEWPORT_W must be divisible by WOLF_UPSCALE");
+  static_assert((VIEWPORT_H % UPSCALE) == 0, "WOLF_VIEWPORT_H must be divisible by WOLF_UPSCALE");
   static constexpr int MAP_MAX_W = Map::MAX_WIDTH;
   static constexpr int MAP_MAX_H = Map::MAX_HEIGHT;
   static constexpr float MOVE_SPEED = 2.2f;
@@ -75,6 +110,7 @@ private:
   static constexpr float HEAD_BOB_SPEED = 12.0f;
   static constexpr float HEAD_BOB_AMPLITUDE = 1.5f;
   static constexpr float HEAD_BOB_SETTLE = 10.0f;
+  static constexpr bool SIDE_SHADE = WOLF_SIDE_SHADE != 0;
   static constexpr float CAMERA_PLANE_SCALE = WOLF_CAMERA_PLANE_SCALE;
   static constexpr float PLAYER_RADIUS = WOLF_PLAYER_RADIUS;
   static constexpr int MINIMAP_CELL = 5;
@@ -129,7 +165,12 @@ private:
   ActionState downAction;
   ActionState fireAction;
 
-  uint16_t frameBuffer[RENDER_W * RENDER_H]{};
+#if WOLF_DYNAMIC_FRAMEBUFFER
+  uint16_t* frameBuffer = nullptr;
+#else
+  uint16_t frameBufferStorage[RENDER_W * RENDER_H]{};
+  uint16_t* frameBuffer = frameBufferStorage;
+#endif
   uint16_t upscaleBuffers[UPSCALE_BUFFER_COUNT][MAX_SCREEN_W * UPSCALE * UPSCALE_CHUNK_SRC_ROWS]{};
   float wallDepth[RENDER_W]{};
   WolfRender::Sprite spriteStorage[SpriteRenderer::MAX_SPRITES]{};
@@ -163,7 +204,12 @@ private:
   uint32_t nextDamageMs = 0;
   WolfProfiler profiler;
   Hud hud;
-  uint8_t map[MAP_MAX_H][MAP_MAX_W]{};
+#if WOLF_HEAP_COLD_BUFFERS
+  uint8_t (*map)[MAP_MAX_W] = nullptr;
+#else
+  uint8_t mapStorage[MAP_MAX_H][MAP_MAX_W]{};
+  uint8_t (*map)[MAP_MAX_W] = mapStorage;
+#endif
   uint8_t doorOpenBits[Map::DOOR_OPEN_BYTES]{};
   int mapWidth = 0;
   int mapHeight = 0;
