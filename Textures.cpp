@@ -29,6 +29,10 @@ bool catalogReady = false;
 const char* lastLookupName = nullptr;
 Asset* lastLookupAsset = nullptr;
 
+bool isSpriteAsset(const char* name) {
+  return name != nullptr && strncmp(name, "sprite_", 7) == 0;
+}
+
 uint16_t readU16(const uint8_t*& cursor, const uint8_t* end) {
   if (cursor + 2 > end) {
     return 0u;
@@ -49,7 +53,10 @@ int clampCoord(int value) {
   return value;
 }
 
-uint16_t decodePaletteIndex(uint8_t paletteIndex) {
+uint16_t decodePaletteIndex(const Entry& entry, uint8_t paletteIndex) {
+  if (isSpriteAsset(entry.asset.name) && paletteIndex == 0u) {
+    return 0;
+  }
   if (paletteIndex >= PALETTE_SIZE) {
     return 0;
   }
@@ -133,7 +140,7 @@ void ensureDecoded(Entry& entry) {
   }
 
   for (uint16_t i = 0; i < entry.texelCount; i++) {
-    decoded[i] = decodePaletteIndex(entry.indices[i]);
+    decoded[i] = decodePaletteIndex(entry, entry.indices[i]);
   }
   entry.asset.pixels = decoded;
 }

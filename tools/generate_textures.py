@@ -108,7 +108,7 @@ def read_palette_gpl(path: Path) -> list[tuple[int, int, int]]:
     return palette
 
 
-def read_bmp(path: Path) -> list[tuple[int, int, int]]:
+def read_bmp(path: Path) -> tuple[list[tuple[int, int, int]], list[int] | None]:
     data = path.read_bytes()
     if data[:2] != b"BM":
         raise ValueError("not a BMP file")
@@ -146,12 +146,15 @@ def read_bmp(path: Path) -> list[tuple[int, int, int]]:
         for i in range(colors_used):
             b, g, r, _ = struct.unpack_from("<BBBB", data, palette_offset + i * 4)
             bmp_palette.append((r, g, b))
+        indices: list[int] = []
         for y in range(height):
             src_y = y if top_down else (height - 1 - y)
             row = pixel_offset + src_y * row_size
             for x in range(width):
-                pixels.append(bmp_palette[data[row + x]])
-        return pixels
+                idx = data[row + x]
+                indices.append(idx)
+                pixels.append(bmp_palette[idx])
+        return pixels, indices
 
     if bitcount not in (24, 32):
         raise ValueError("only 8-bit indexed, 24-bit and 32-bit BMP are supported")
@@ -166,7 +169,7 @@ def read_bmp(path: Path) -> list[tuple[int, int, int]]:
             g = data[px + 1]
             r = data[px + 2]
             pixels.append((r, g, b))
-    return pixels
+    return pixels, None
 
 
 def nearest_palette_color(rgb: tuple[int, int, int], palette: list[tuple[int, int, int]]) -> tuple[int, int, int]:
@@ -219,8 +222,11 @@ def load_assets(palette: list[tuple[int, int, int]]) -> list[tuple[str, list[int
     assets: list[tuple[str, list[int]]] = []
     for bmp_path in sorted(TEXTURES_DIR.glob("*.bmp")):
         name = bmp_path.stem
-        pixels = read_bmp(bmp_path)
-        indexed = [palette_index(px, palette) for px in pixels]
+        pixels, source_indices = read_bmp(bmp_path)
+        if source_indices is not None:
+            indexed = source_indices
+        else:
+            indexed = [palette_index(px, palette) for px in pixels]
         assets.append((name, indexed))
     return assets
 
