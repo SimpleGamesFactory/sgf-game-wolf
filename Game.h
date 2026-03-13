@@ -35,6 +35,7 @@
 #include "Map.h"
 #include "Sprite.h"
 #include "SpriteRenderer.h"
+#include "Walls.h"
 #include "WolfProfiler.h"
 #include "Zombie.h"
 
@@ -66,7 +67,6 @@ private:
   static constexpr bool SIMPLE_FLOOR = WOLF_SIMPLE_FLOOR != 0;
   static constexpr int RENDER_W = VIEWPORT_W / UPSCALE;
   static constexpr int RENDER_H = VIEWPORT_H / UPSCALE;
-  static constexpr int TEX_SIZE = 16;
   static constexpr int MAP_MAX_W = Map::MAX_WIDTH;
   static constexpr int MAP_MAX_H = Map::MAX_HEIGHT;
   static constexpr float MOVE_SPEED = 2.2f;
@@ -213,6 +213,4 @@ private:
   void fillRect(int x0, int y0, int w, int h, uint16_t color565);
   void putPixel(int x, int y, uint16_t color565);
   uint16_t shadeColor(uint16_t color565, float distance, bool side) const;
-  uint16_t wallColor(uint8_t tile) const;
-  uint16_t wallTexel(uint8_t tile, int texX, int texY) const;
 };

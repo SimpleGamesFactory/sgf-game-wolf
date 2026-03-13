@@ -14,6 +14,7 @@
 #include "SGF/FontRenderer.h"
 #include "SGF/IFillRect.h"
 #include "SGF/Math.h"
+#include "Walls.h"
 
 namespace {
 
@@ -854,10 +855,10 @@ void Wolf3DGame::renderWorld() {
     }
     wallX -= floorf(wallX);
 
-    int texX = static_cast<int>(wallX * static_cast<float>(TEX_SIZE));
-    texX = Math::clamp(texX, 0, TEX_SIZE - 1);
+    int texX = static_cast<int>(wallX * static_cast<float>(Walls::TEX_SIZE));
+    texX = Math::clamp(texX, 0, Walls::TEX_SIZE - 1);
     if ((!side && rayDirX > 0.0f) || (side && rayDirY < 0.0f)) {
-      texX = TEX_SIZE - texX - 1;
+      texX = Walls::TEX_SIZE - texX - 1;
     }
 
     wallDepth[x] = perpWallDist;
@@ -985,19 +986,19 @@ void Wolf3DGame::renderColumn(
   if (span <= 0) {
     return;
   }
-  uint16_t shadedColumn[TEX_SIZE];
-  for (int texY = 0; texY < TEX_SIZE; texY++) {
-    shadedColumn[texY] = shadeColor(wallTexel(tile, texX, texY), distance, side);
+  uint16_t shadedColumn[Walls::TEX_SIZE];
+  for (int texY = 0; texY < Walls::TEX_SIZE; texY++) {
+    shadedColumn[texY] = shadeColor(Walls::texel(tile, texX, texY), distance, side);
   }
-  int texStep = (TEX_SIZE << 16) / Math::clamp(lineHeight, 1, 1 << 14);
+  int texStep = (Walls::TEX_SIZE << 16) / Math::clamp(lineHeight, 1, 1 << 14);
   int texPos = (drawStart - rawDrawStart) * texStep;
   for (int y = drawStart; y <= drawEnd; y++) {
     int texY = texPos >> 16;
     if (texY < 0) {
       texY = 0;
     }
-    if (texY >= TEX_SIZE) {
-      texY = TEX_SIZE - 1;
+    if (texY >= Walls::TEX_SIZE) {
+      texY = Walls::TEX_SIZE - 1;
     }
     frameBuffer[y * RENDER_W + x] = shadedColumn[texY];
     texPos += texStep;
@@ -1036,86 +1037,4 @@ uint16_t Wolf3DGame::shadeColor(uint16_t color565, float distance, bool side) co
   uint8_t g = static_cast<uint8_t>((static_cast<float>(g6) * 255.0f / 63.0f) * brightness);
   uint8_t b = static_cast<uint8_t>((static_cast<float>(b5) * 255.0f / 31.0f) * brightness);
   return Color565::rgb(r, g, b);
-}
-
-uint16_t Wolf3DGame::wallColor(uint8_t tile) const {
-  switch (tile) {
-    case 1: return Color565::rgb(176, 72, 64);
-    case 2: return Color565::rgb(80, 168, 96);
-    case 3: return Color565::rgb(72, 116, 196);
-    case 4: return Color565::rgb(196, 168, 80);
-    case 5: return Color565::rgb(168, 92, 180);
-    case 6: return Color565::rgb(72, 180, 196);
-    case 7: return Color565::rgb(180, 108, 72);
-    case 8: return Color565::rgb(196, 72, 128);
-    case 9: return Color565::rgb(224, 224, 224);
-    default: return Color565::rgb(255, 255, 255);
-  }
-}
-
-uint16_t Wolf3DGame::wallTexel(uint8_t tile, int texX, int texY) const {
-  if (Door::isTile(tile)) {
-    return Door::texel(tile, texX, texY);
-  }
-
-  uint16_t base = wallColor(tile);
-  uint16_t dark = Color565::darken(base);
-  uint16_t light = Color565::lighten(base);
-
-  bool edge = (texX == 0 || texY == 0 || texX == TEX_SIZE - 1 || texY == TEX_SIZE - 1);
-  bool mortar = ((texX % 8) == 0) || ((texY % 8) == 0);
-  bool stripe = ((texX / 3) % 2) == 0;
-  bool checker = (((texX / 4) + (texY / 4)) % 2) == 0;
-  bool diamond = abs(texX - 8) + abs(texY - 8) < 5;
-  bool slit = (texX > 5 && texX < 10 && texY > 2 && texY < 13);
-
-  switch (tile) {
-    case 1:
-      if (edge || mortar) {
-        return dark;
-      }
-      return base;
-    case 2:
-      if (edge) {
-        return dark;
-      }
-      return stripe ? light : base;
-    case 3:
-      if (edge) {
-        return light;
-      }
-      return checker ? base : dark;
-    case 4:
-      if (edge || ((texY % 5) == 0)) {
-        return dark;
-      }
-      return ((texX % 5) == 0) ? light : base;
-    case 5:
-      if (edge) {
-        return dark;
-      }
-      return diamond ? light : base;
-    case 6:
-      if (edge || slit) {
-        return dark;
-      }
-      return (texY < 3 || texY > 12) ? light : base;
-    case 7:
-      if (edge) {
-        return dark;
-      }
-      return ((texX + texY) % 6) < 3 ? base : light;
-    case 8:
-      if (edge) {
-        return dark;
-      }
-      return ((texX - texY + TEX_SIZE) % 6) < 3 ? light : base;
-    case 9:
-      if (edge || checker) {
-        return dark;
-      }
-      return light;
-    default:
-      return base;
-  }
 }
