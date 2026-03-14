@@ -618,7 +618,11 @@ void Wolf3DGame::shoot() {
     }
   }
   if (targetIndex >= 0) {
+    bool wasAlive = zombies[targetIndex].isAlive();
     zombies[targetIndex].applyDamage(shotDamage(bestDistance));
+    if (wasAlive && !zombies[targetIndex].isAlive()) {
+      audio.playZombieDie();
+    }
   }
 }
 
@@ -730,8 +734,12 @@ void Wolf3DGame::updateInput(float delta) {
 void Wolf3DGame::updateZombies(float delta) {
   Zombie::WorldView world = makeZombieWorldView(millis(), delta);
   int damage = 0;
+  int shots = 0;
   for (int i = 0; i < zombieCount; i++) {
-    zombies[i].update(world, damage);
+    zombies[i].update(world, damage, shots);
+  }
+  if (shots > 0) {
+    audio.playZombieFire();
   }
   if (damage > 0) {
     applyDamage(damage);
@@ -1171,7 +1179,7 @@ void Wolf3DGame::renderSprites(uint32_t nowMs) {
   }
 
   for (int i = 0; i < zombieCount && spriteCount < SpriteRenderer::MAX_SPRITES; i++) {
-    if (!zombies[i].isAlive()) {
+    if (!zombies[i].isAlive() && !zombies[i].hasCorpse()) {
       continue;
     }
     spriteRefs[spriteCount] = &zombies[i].sprite();

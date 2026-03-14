@@ -31,12 +31,13 @@ public:
   void clear();
   void spawn(float x, float y);
   bool isAlive() const;
+  bool hasCorpse() const;
   float getX() const;
   float getY() const;
   bool isAttacking(uint32_t nowMs) const;
   void kill();
   void applyDamage(int amount);
-  void update(const WorldView& world, int& damageOut);
+  void update(const WorldView& world, int& damageOut, int& shotsOut);
   bool tryHit(const AimView& aim, float& hitDistance) const;
   uint16_t texel(int texX, int texY, uint32_t nowMs) const;
   const WolfRender::ISprite& sprite() const { return renderSprite; }
@@ -58,6 +59,7 @@ private:
   float y = 0.0f;
   int hp = 0;
   bool alive = false;
+  bool corpse = false;
   uint32_t nextShotMs = 0;
   uint32_t attackUntilMs = 0;
   WolfRender::Sprite renderSprite;

@@ -11,6 +11,7 @@
 namespace {
 
 constexpr const char* ZOMBIE_TEXTURE_NAME = "sprite_zombie";
+constexpr const char* ZOMBIE_DEAD_TEXTURE_NAME = "sprite_zombie_dead";
 
 uint16_t applyAttackTint(uint16_t color565) {
   uint8_t r5 = (color565 >> 11) & 0x1F;
@@ -55,6 +56,7 @@ void Zombie::clear() {
   y = 0.0f;
   hp = 0;
   alive = false;
+  corpse = false;
   nextShotMs = 0;
   attackUntilMs = 0;
   renderSprite.clear();
@@ -65,6 +67,7 @@ void Zombie::spawn(float spawnX, float spawnY) {
   y = spawnY;
   hp = MAX_HP;
   alive = true;
+  corpse = false;
   nextShotMs = 0;
   attackUntilMs = 0;
   renderSprite.configure(x, y, TEX_SIZE, 3, 4, 8, 12.0f, this, buildSpriteTexture);
@@ -72,6 +75,10 @@ void Zombie::spawn(float spawnX, float spawnY) {
 
 bool Zombie::isAlive() const {
   return alive;
+}
+
+bool Zombie::hasCorpse() const {
+  return corpse;
 }
 
 float Zombie::getX() const {
@@ -89,7 +96,7 @@ bool Zombie::isAttacking(uint32_t nowMs) const {
 void Zombie::kill() {
   hp = 0;
   alive = false;
-  renderSprite.clear();
+  corpse = true;
 }
 
 void Zombie::applyDamage(int amount) {
@@ -102,7 +109,7 @@ void Zombie::applyDamage(int amount) {
   }
 }
 
-void Zombie::update(const WorldView& world, int& damageOut) {
+void Zombie::update(const WorldView& world, int& damageOut, int& shotsOut) {
   if (!alive) {
     return;
   }
@@ -137,6 +144,7 @@ void Zombie::update(const WorldView& world, int& damageOut) {
       world.nowMs >= nextShotMs &&
       !lineBlocked(world, x, y, world.playerX, world.playerY)) {
     damageOut += DAMAGE;
+    shotsOut++;
     attackUntilMs = world.nowMs + ATTACK_FLASH_MS;
     nextShotMs = world.nowMs + SHOT_COOLDOWN_MS;
   }
@@ -202,10 +210,11 @@ uint16_t Zombie::texel(int texX, int texY, uint32_t nowMs) const {
 
 void Zombie::buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_t nowMs) {
   const Zombie& zombie = *static_cast<const Zombie*>(owner);
-  const uint16_t* bmpTexture = Textures::pixels(ZOMBIE_TEXTURE_NAME);
+  const char* textureName = zombie.alive ? ZOMBIE_TEXTURE_NAME : ZOMBIE_DEAD_TEXTURE_NAME;
+  const uint16_t* bmpTexture = Textures::pixels(textureName);
   if (bmpTexture != nullptr) {
     memcpy(outTexture, bmpTexture, TEX_SIZE * TEX_SIZE * sizeof(uint16_t));
-    if (zombie.isAttacking(nowMs)) {
+    if (zombie.alive && zombie.isAttacking(nowMs)) {
       for (int i = 0; i < TEX_SIZE * TEX_SIZE; i++) {
         if (outTexture[i] != 0) {
           outTexture[i] = applyAttackTint(outTexture[i]);
@@ -217,7 +226,25 @@ void Zombie::buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_
 
   for (int texY = 0; texY < TEX_SIZE; texY++) {
     for (int texX = 0; texX < TEX_SIZE; texX++) {
-      outTexture[texY * TEX_SIZE + texX] = zombie.texel(texX, texY, nowMs);
+      if (!zombie.alive) {
+        bool body =
+          (texY >= 8 && texY <= 11 && texX >= 2 && texX <= 13) ||
+          (texY >= 11 && texY <= 13 && texX >= 4 && texX <= 11) ||
+          (texY == 7 && texX >= 4 && texX <= 6);
+        bool head = (texY >= 6 && texY <= 8 && texX >= 11 && texX <= 13);
+        bool blood = (texY == 12 && texX >= 11 && texX <= 13);
+        if (blood) {
+          outTexture[texY * TEX_SIZE + texX] = Color565::rgb(132, 28, 20);
+        } else if (head) {
+          outTexture[texY * TEX_SIZE + texX] = Color565::rgb(118, 152, 98);
+        } else if (body) {
+          outTexture[texY * TEX_SIZE + texX] = Color565::rgb(74, 92, 122);
+        } else {
+          outTexture[texY * TEX_SIZE + texX] = 0;
+        }
+      } else {
+        outTexture[texY * TEX_SIZE + texX] = zombie.texel(texX, texY, nowMs);
+      }
     }
   }
 }

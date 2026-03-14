@@ -119,6 +119,61 @@ constexpr Sfx kDoorSfx{
   .stepCount = static_cast<uint8_t>(sizeof(kDoorSteps) / sizeof(kDoorSteps[0])),
 };
 
+constexpr PitchPoint kZombieFirePitchEnv[] = {
+  {0u, 180},
+  {55u, -120},
+};
+
+constexpr Instrument kZombieFireInstrument{
+  .waveform = Waveform::Square,
+  .ampEnv = {0u, 24u, 0u, 24u},
+  .pitchLfo = {},
+  .pitchEnv = kZombieFirePitchEnv,
+  .pitchEnvCount = static_cast<uint8_t>(sizeof(kZombieFirePitchEnv) / sizeof(kZombieFirePitchEnv[0])),
+  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .lowPassCutoffHz = 1500.0f,
+  .highPassCutoffHz = 160.0f,
+  .volume = 180u,
+};
+
+constexpr SfxStep kZombieFireSteps[] = {
+  {65u, 0, 0, 255u, true, true},
+};
+
+constexpr Sfx kZombieFireSfx{
+  .instrument = &kZombieFireInstrument,
+  .steps = kZombieFireSteps,
+  .stepCount = static_cast<uint8_t>(sizeof(kZombieFireSteps) / sizeof(kZombieFireSteps[0])),
+};
+
+constexpr PitchPoint kZombieDiePitchEnv[] = {
+  {0u, 0},
+  {80u, -420},
+  {180u, -860},
+};
+
+constexpr Instrument kZombieDieInstrument{
+  .waveform = Waveform::Noise,
+  .ampEnv = {0u, 70u, 0u, 90u},
+  .pitchLfo = {},
+  .pitchEnv = kZombieDiePitchEnv,
+  .pitchEnvCount = static_cast<uint8_t>(sizeof(kZombieDiePitchEnv) / sizeof(kZombieDiePitchEnv[0])),
+  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .lowPassCutoffHz = 1800.0f,
+  .highPassCutoffHz = 110.0f,
+  .volume = 190u,
+};
+
+constexpr SfxStep kZombieDieSteps[] = {
+  {180u, -8, 0, 255u, true, true},
+};
+
+constexpr Sfx kZombieDieSfx{
+  .instrument = &kZombieDieInstrument,
+  .steps = kZombieDieSteps,
+  .stepCount = static_cast<uint8_t>(sizeof(kZombieDieSteps) / sizeof(kZombieDieSteps[0])),
+};
+
 constexpr Instrument kMusicInstrument{
   .waveform = Waveform::Sine,
   .ampEnv = {10u, 40u, 180u, 50u},
@@ -307,6 +362,8 @@ WolfAudio::WolfAudio()
   hitInstrument = kHitInstrument;
   pickupInstrument = kPickupInstrument;
   doorInstrument = kDoorInstrument;
+  zombieFireInstrument = kZombieFireInstrument;
+  zombieDieInstrument = kZombieDieInstrument;
   leadInstrument = kMusicInstrument;
   bassInstrument = kBassInstrument;
   hatInstrument = kHatInstrument;
@@ -315,6 +372,8 @@ WolfAudio::WolfAudio()
   hitSampleInstrument = kSampleOneShotInstrument;
   pickupSampleInstrument = kSampleOneShotInstrument;
   doorSampleInstrument = kSampleOneShotInstrument;
+  zombieFireSampleInstrument = kSampleOneShotInstrument;
+  zombieDieSampleInstrument = kSampleOneShotInstrument;
   leadSampleInstrument = kSamplePitchedInstrument;
   bassSampleInstrument = kSamplePitchedInstrument;
   hatSampleInstrument = kSampleOneShotInstrument;
@@ -331,6 +390,10 @@ WolfAudio::WolfAudio()
   pickupSfx.instrument = &pickupInstrument;
   doorSfx = kDoorSfx;
   doorSfx.instrument = &doorInstrument;
+  zombieFireSfx = kZombieFireSfx;
+  zombieFireSfx.instrument = &zombieFireInstrument;
+  zombieDieSfx = kZombieDieSfx;
+  zombieDieSfx.instrument = &zombieDieInstrument;
 
   songLanes[0] = {
     .voiceIndex = kLeadVoice,
@@ -384,6 +447,14 @@ void WolfAudio::configureSampleOverrides() {
   if (const AudioSample* sample = WolfAudioSamples::find("door")) {
     doorSampleInstrument = kSampleOneShotInstrument;
     doorSampleInstrument.sample = sample;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("zombie_fire")) {
+    zombieFireSampleInstrument = kSampleOneShotInstrument;
+    zombieFireSampleInstrument.sample = sample;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("zombie_die")) {
+    zombieDieSampleInstrument = kSampleOneShotInstrument;
+    zombieDieSampleInstrument.sample = sample;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("lead")) {
     leadSampleInstrument = kSamplePitchedInstrument;
@@ -467,5 +538,21 @@ void WolfAudio::playDoorOpen() {
     samplePlayer.playOneShot(doorSampleInstrument, 255u);
   } else {
     playSynthSfx(doorSfx, 196.0f, 255u);
+  }
+}
+
+void WolfAudio::playZombieFire() {
+  if (zombieFireSampleInstrument.sample != nullptr) {
+    samplePlayer.playOneShot(zombieFireSampleInstrument, 255u);
+  } else {
+    playSynthSfx(zombieFireSfx, 240.0f, 255u);
+  }
+}
+
+void WolfAudio::playZombieDie() {
+  if (zombieDieSampleInstrument.sample != nullptr) {
+    samplePlayer.playOneShot(zombieDieSampleInstrument, 255u);
+  } else {
+    playSynthSfx(zombieDieSfx, 160.0f, 255u);
   }
 }
