@@ -6,11 +6,11 @@
 #
 # Format źródłowy WAV:
 # - PCM bez kompresji
-# - mono
+# - mono albo stereo
 # - 8-bit albo 16-bit
 # - sample rate dowolny
-# Generator konwertuje to do wewnętrznego 8-bit mono PCM i normalizuje peak do
-# pełnej skali.
+# Generator konwertuje to do wewnętrznego 8-bit mono PCM bez normalizacji
+# amplitudy.
 #
 # `root` to częstotliwość referencyjna sample'a:
 # - dla lead/bass ustaw realną nutę bazową sample'a

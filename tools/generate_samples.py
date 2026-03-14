@@ -89,14 +89,6 @@ def load_wav_as_int8(path: Path) -> tuple[list[int], int]:
                 right = int.from_bytes(raw[i + 2:i + 4], byteorder="little", signed=True)
                 sample16 = int(round((left + right) / 2.0))
             data.append(max(-128, min(127, sample16 >> 8)))
-    peak = max((abs(value) for value in data), default=0)
-    if peak > 0 and peak < 127:
-        scale = 127.0 / float(peak)
-        normalized: list[int] = []
-        for value in data:
-            scaled = int(round(value * scale))
-            normalized.append(max(-128, min(127, scaled)))
-        data = normalized
     return data, sample_rate
 
 

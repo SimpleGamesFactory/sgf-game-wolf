@@ -263,7 +263,7 @@ constexpr Instrument kHatInstrument{
   .filterFlags = static_cast<uint8_t>(FilterHighPass),
   .lowPassCutoffHz = 0.0f,
   .highPassCutoffHz = 2600.0f,
-  .volume = 46u,
+  .volume = 66u,
 };
 
 constexpr Instrument kSnareInstrumentFallback{
@@ -275,7 +275,7 @@ constexpr Instrument kSnareInstrumentFallback{
   .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
   .lowPassCutoffHz = 2200.0f,
   .highPassCutoffHz = 700.0f,
-  .volume = 62u,
+  .volume = 32u,
 };
 
 constexpr SampleInstrument kSampleOneShotInstrument{
@@ -328,28 +328,40 @@ constexpr Pattern kLeadPatternB{
   .loop = false,
 };
 
-constexpr PatternStep kBassPatternCSteps[] = {
-  {65.41f, 4u, 132u},   // C2
-  {65.41f, 1u, 132u},
-  {0.0f,   27u, 0u},    // pause
+constexpr PatternStep kBassPatternSteps[] = {
+  {41.20f, 1u, 132u},   // E1
+  {41.20f, 1u, 132u},   // E1
+  {43.65f, 1u, 132u},   // F1
+  {41.20f, 1u, 132u},   // E1
+  {0.0f,  1u, 0u},      // P
+  {41.20f, 1u, 132u},   // E1
+  {43.65f, 1u, 132u},   // F1
+  {41.20f, 1u, 132u},   // E1
+  {0.0f,  1u, 0u},      // P
+  {41.20f, 1u, 132u},   // E1
+  {43.65f, 1u, 132u},   // F1
+  {41.20f, 1u, 132u},   // E1
+  {36.71f, 1u, 132u},   // D1
+  {30.87f, 1u, 132u},   // B0
+  {36.71f, 1u, 132u},   // D1
+  {41.20f, 1u, 132u},   // E1
 };
 
-constexpr Pattern kBassPatternC{
-  .steps = kBassPatternCSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternCSteps) / sizeof(kBassPatternCSteps[0])),
+constexpr Pattern kBassPattern{
+  .steps = kBassPatternSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternSteps) / sizeof(kBassPatternSteps[0])),
   .unitMs = kBaseStepMs,
   .loop = false,
 };
 
-constexpr PatternStep kBassPatternFSteps[] = {
-  {87.31f, 4u, 132u},   // F2
-  {87.31f, 1u, 132u},
-  {0.0f,   27u, 0u},
+constexpr PatternStep kBassPatternEndSteps[] = {
+  {41.20f, 4u, 132u},   // E1
+  {0.0f,  12u, 0u},     // P
 };
 
-constexpr Pattern kBassPatternF{
-  .steps = kBassPatternFSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternFSteps) / sizeof(kBassPatternFSteps[0])),
+constexpr Pattern kBassPatternEnd{
+  .steps = kBassPatternEndSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternEndSteps) / sizeof(kBassPatternEndSteps[0])),
   .unitMs = kBaseStepMs,
   .loop = false,
 };
@@ -390,8 +402,8 @@ constexpr SongClip kLeadClips[] = {
 };
 
 constexpr SongClip kBassClips[] = {
-  {.pattern = &kBassPatternC, .repeats = 1u},
-  {.pattern = &kBassPatternF, .repeats = 1u},
+  {.pattern = &kBassPattern, .repeats = 4u},
+  {.pattern = &kBassPatternEnd, .repeats = 4u},
 };
 
 constexpr SongClip kHatClips[] = {
@@ -459,13 +471,6 @@ WolfAudio::WolfAudio()
   ghostDieSfx = kGhostDieSfx;
   ghostDieSfx.instrument = &ghostDieInstrument;
 
-  songLanes[0] = {
-    .voiceIndex = kLeadVoice,
-    .player = &synthEngine,
-    .program = makeProgramRef(leadInstrument),
-    .clips = kLeadClips,
-    .clipCount = static_cast<uint16_t>(sizeof(kLeadClips) / sizeof(kLeadClips[0])),
-  };
   songLanes[1] = {
     .voiceIndex = kBassVoice,
     .player = &synthEngine,
@@ -532,8 +537,6 @@ void WolfAudio::configureSampleOverrides() {
     leadSampleInstrument = kSamplePitchedInstrument;
     leadSampleInstrument.sample = sample;
     leadSampleInstrument.volume = kMusicInstrument.volume;
-    songLanes[0].player = &samplePlayer;
-    songLanes[0].program = makeProgramRef(leadSampleInstrument);
   }
   if (const AudioSample* sample = WolfAudioSamples::find("bass")) {
     bassSampleInstrument = kSamplePitchedInstrument;
