@@ -4,6 +4,9 @@
 #define WOLF_AUDIO_DIAG_TONE 0
 #endif
 
+#include "SGF/AudioMixer.h"
+#include "SGF/AudioTypes.h"
+#include "SGF/SamplePlayer.h"
 #include "SGF/Song.h"
 #include "SGF/Synth.h"
 
@@ -14,7 +17,7 @@ public:
   SGFAudio::SynthEngine& synth() { return synthEngine; }
   const SGFAudio::SynthEngine& synth() const { return synthEngine; }
 
-  uint32_t sampleRate() const override { return synthEngine.sampleRate(); }
+  uint32_t sampleRate() const override { return mixer.sampleRate(); }
   int16_t renderSample() override;
   void playFire();
   void playHit();
@@ -22,10 +25,12 @@ public:
   void playDoorOpen();
 
 private:
-  void playSfx(const SGFAudio::Sfx& sfx, float baseHz, uint8_t velocity = 255u);
+  void playSynthSfx(const SGFAudio::Sfx& sfx, float baseHz, uint8_t velocity = 255u);
   void configureSampleOverrides();
 
+  SGFAudio::AudioMixer mixer;
   SGFAudio::SynthEngine synthEngine;
+  SGFAudio::SamplePlayer samplePlayer;
   SGFAudio::Instrument fireInstrument{};
   SGFAudio::Instrument hitInstrument{};
   SGFAudio::Instrument pickupInstrument{};
@@ -34,6 +39,14 @@ private:
   SGFAudio::Instrument bassInstrument{};
   SGFAudio::Instrument hatInstrument{};
   SGFAudio::Instrument snareInstrument{};
+  SGFAudio::SampleInstrument fireSampleInstrument{};
+  SGFAudio::SampleInstrument hitSampleInstrument{};
+  SGFAudio::SampleInstrument pickupSampleInstrument{};
+  SGFAudio::SampleInstrument doorSampleInstrument{};
+  SGFAudio::SampleInstrument leadSampleInstrument{};
+  SGFAudio::SampleInstrument bassSampleInstrument{};
+  SGFAudio::SampleInstrument hatSampleInstrument{};
+  SGFAudio::SampleInstrument snareSampleInstrument{};
   SGFAudio::Sfx fireSfx{};
   SGFAudio::Sfx hitSfx{};
   SGFAudio::Sfx pickupSfx{};
@@ -41,5 +54,5 @@ private:
   SGFAudio::SongLane songLanes[4]{};
   SGFAudio::Song song{};
   SGFAudio::SongPlayer songPlayer;
-  uint8_t nextSfxVoice = 0u;
+  uint8_t nextSynthSfxVoice = 0u;
 };

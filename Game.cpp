@@ -522,6 +522,7 @@ bool Wolf3DGame::toggleDoorAhead() {
   if (isDoorOpen(cellX, cellY)) {
     if (canCloseDoor(cellX, cellY)) {
       setDoorOpen(cellX, cellY, false);
+      audio.playDoorOpen();
     }
   } else {
     KeyColor required = Door::requiredKey(map[cellY][cellX]);
@@ -837,6 +838,16 @@ void Wolf3DGame::presentFrame() {
     renderTarget.supportsQueuedPreSwappedBlit565Stream();
   int queuedChunks = 0;
   int chunkIndex = 0;
+  if (UPSCALE == 1 && hitFlashStrength == 0 && muzzleFlashStrength == 0) {
+    if (streamViewport) {
+      renderTarget.beginBlit565Stream(VIEWPORT_X, VIEWPORT_Y, VIEWPORT_W, VIEWPORT_H);
+      renderTarget.writeBlit565StreamChunk(fb, static_cast<size_t>(VIEWPORT_W * VIEWPORT_H));
+      renderTarget.endBlit565Stream();
+    } else {
+      renderTarget.blit565(VIEWPORT_X, VIEWPORT_Y, VIEWPORT_W, VIEWPORT_H, fb);
+    }
+    return;
+  }
   if (streamViewport) {
     renderTarget.beginBlit565Stream(VIEWPORT_X, VIEWPORT_Y, VIEWPORT_W, VIEWPORT_H);
   }

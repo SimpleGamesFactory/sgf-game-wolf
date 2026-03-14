@@ -63,19 +63,32 @@ def load_wav_as_int8(path: Path) -> tuple[list[int], int]:
         frame_count = wav.getnframes()
         raw = wav.readframes(frame_count)
 
-    if channels != 1:
-        raise ValueError(f"{path.name}: only mono WAV is supported")
+    if channels not in (1, 2):
+        raise ValueError(f"{path.name}: only mono or stereo WAV is supported")
     if sample_width not in (1, 2):
         raise ValueError(f"{path.name}: only 8-bit or 16-bit PCM WAV is supported")
 
     data: list[int] = []
     if sample_width == 1:
-        for value in raw:
-            data.append(value - 128)
+        step = channels
+        for i in range(0, len(raw), step):
+            if channels == 1:
+                sample = raw[i] - 128
+            else:
+                left = raw[i] - 128
+                right = raw[i + 1] - 128
+                sample = int(round((left + right) / 2.0))
+            data.append(sample)
     else:
-        for i in range(0, len(raw), 2):
-            sample = int.from_bytes(raw[i:i + 2], byteorder="little", signed=True)
-            data.append(max(-128, min(127, sample >> 8)))
+        step = 2 * channels
+        for i in range(0, len(raw), step):
+            if channels == 1:
+                sample16 = int.from_bytes(raw[i:i + 2], byteorder="little", signed=True)
+            else:
+                left = int.from_bytes(raw[i:i + 2], byteorder="little", signed=True)
+                right = int.from_bytes(raw[i + 2:i + 4], byteorder="little", signed=True)
+                sample16 = int(round((left + right) / 2.0))
+            data.append(max(-128, min(127, sample16 >> 8)))
     peak = max((abs(value) for value in data), default=0)
     if peak > 0 and peak < 127:
         scale = 127.0 / float(peak)

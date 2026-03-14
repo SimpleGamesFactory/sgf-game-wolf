@@ -128,7 +128,7 @@ constexpr Instrument kMusicInstrument{
   .filterFlags = static_cast<uint8_t>(FilterLowPass),
   .lowPassCutoffHz = 1800.0f,
   .highPassCutoffHz = 0.0f,
-  .volume = 150u,
+  .volume = 75u,
 };
 
 constexpr Instrument kBassInstrument{
@@ -140,7 +140,7 @@ constexpr Instrument kBassInstrument{
   .filterFlags = FilterNone,
   .lowPassCutoffHz = 0.0f,
   .highPassCutoffHz = 0.0f,
-  .volume = 118u,
+  .volume = 59u,
 };
 
 constexpr Instrument kHatInstrument{
@@ -152,12 +152,11 @@ constexpr Instrument kHatInstrument{
   .filterFlags = static_cast<uint8_t>(FilterHighPass),
   .lowPassCutoffHz = 0.0f,
   .highPassCutoffHz = 2600.0f,
-  .volume = 92u,
+  .volume = 46u,
 };
 
 constexpr Instrument kSnareInstrumentFallback{
   .waveform = Waveform::Noise,
-  .sample = &WolfAudioSamples::kSnare,
   .ampEnv = {0u, 18u, 0u, 28u},
   .pitchLfo = {},
   .pitchEnv = nullptr,
@@ -165,43 +164,19 @@ constexpr Instrument kSnareInstrumentFallback{
   .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
   .lowPassCutoffHz = 2200.0f,
   .highPassCutoffHz = 700.0f,
-  .volume = 124u,
+  .volume = 62u,
 };
 
-constexpr Instrument kSampleOneShotInstrument{
-  .waveform = Waveform::Sine,
+constexpr SampleInstrument kSampleOneShotInstrument{
   .sample = nullptr,
-  .ampEnv = {0u, 0u, 255u, 0u},
-  .pitchLfo = {},
-  .pitchEnv = nullptr,
-  .pitchEnvCount = 0u,
-  .filterFlags = FilterNone,
-  .lowPassCutoffHz = 0.0f,
-  .highPassCutoffHz = 0.0f,
   .volume = 255u,
+  .oneShot = true,
 };
 
-constexpr Instrument kSamplePitchedInstrument{
-  .waveform = Waveform::Sine,
+constexpr SampleInstrument kSamplePitchedInstrument{
   .sample = nullptr,
-  .ampEnv = {0u, 0u, 255u, 0u},
-  .pitchLfo = {},
-  .pitchEnv = nullptr,
-  .pitchEnvCount = 0u,
-  .filterFlags = FilterNone,
-  .lowPassCutoffHz = 0.0f,
-  .highPassCutoffHz = 0.0f,
   .volume = 180u,
-};
-
-constexpr SfxStep kSampleOneShotSteps[] = {
-  {0u, 0, 0, 255u, true, true},
-};
-
-constexpr Sfx kSampleOneShotSfx{
-  .instrument = nullptr,
-  .steps = kSampleOneShotSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kSampleOneShotSteps) / sizeof(kSampleOneShotSteps[0])),
+  .oneShot = false,
 };
 
 constexpr uint16_t kBaseStepMs = 180u;
@@ -319,7 +294,13 @@ constexpr SongClip kSnareClips[] = {
 }  // namespace
 
 WolfAudio::WolfAudio()
-  : synthEngine(11025u) {
+  : mixer(11025u),
+    synthEngine(11025u),
+    samplePlayer(11025u),
+    songPlayer() {
+  mixer.setMasterVolume(255u);
+  mixer.addSource(synthEngine);
+  mixer.addSource(samplePlayer);
   synthEngine.setMasterVolume(180u);
 
   fireInstrument = kFireInstrument;
@@ -330,6 +311,18 @@ WolfAudio::WolfAudio()
   bassInstrument = kBassInstrument;
   hatInstrument = kHatInstrument;
   snareInstrument = kSnareInstrumentFallback;
+  fireSampleInstrument = kSampleOneShotInstrument;
+  hitSampleInstrument = kSampleOneShotInstrument;
+  pickupSampleInstrument = kSampleOneShotInstrument;
+  doorSampleInstrument = kSampleOneShotInstrument;
+  leadSampleInstrument = kSamplePitchedInstrument;
+  bassSampleInstrument = kSamplePitchedInstrument;
+  hatSampleInstrument = kSampleOneShotInstrument;
+  snareSampleInstrument = {
+    .sample = &WolfAudioSamples::kSnare,
+    .volume = kSnareInstrumentFallback.volume,
+    .oneShot = true,
+  };
   fireSfx = kFireSfx;
   fireSfx.instrument = &fireInstrument;
   hitSfx = kHitSfx;
@@ -338,29 +331,32 @@ WolfAudio::WolfAudio()
   pickupSfx.instrument = &pickupInstrument;
   doorSfx = kDoorSfx;
   doorSfx.instrument = &doorInstrument;
-  configureSampleOverrides();
 
   songLanes[0] = {
     .voiceIndex = kLeadVoice,
-    .instrument = &leadInstrument,
+    .player = &synthEngine,
+    .program = makeProgramRef(leadInstrument),
     .clips = kLeadClips,
     .clipCount = static_cast<uint16_t>(sizeof(kLeadClips) / sizeof(kLeadClips[0])),
   };
   songLanes[1] = {
     .voiceIndex = kBassVoice,
-    .instrument = &bassInstrument,
+    .player = &synthEngine,
+    .program = makeProgramRef(bassInstrument),
     .clips = kBassClips,
     .clipCount = static_cast<uint16_t>(sizeof(kBassClips) / sizeof(kBassClips[0])),
   };
   songLanes[2] = {
     .voiceIndex = kHatVoice,
-    .instrument = &hatInstrument,
+    .player = &synthEngine,
+    .program = makeProgramRef(hatInstrument),
     .clips = kHatClips,
     .clipCount = static_cast<uint16_t>(sizeof(kHatClips) / sizeof(kHatClips[0])),
   };
   songLanes[3] = {
     .voiceIndex = kSnareVoice,
-    .instrument = &snareInstrument,
+    .player = &samplePlayer,
+    .program = makeProgramRef(snareSampleInstrument),
     .clips = kSnareClips,
     .clipCount = static_cast<uint16_t>(sizeof(kSnareClips) / sizeof(kSnareClips[0])),
   };
@@ -368,53 +364,52 @@ WolfAudio::WolfAudio()
     .lanes = songLanes,
     .laneCount = static_cast<uint8_t>(sizeof(songLanes) / sizeof(songLanes[0])),
   };
-  songPlayer.bind(synthEngine, song);
+  configureSampleOverrides();
+  songPlayer.bind(song);
 }
 
 void WolfAudio::configureSampleOverrides() {
   if (const AudioSample* sample = WolfAudioSamples::find("fire")) {
-    fireInstrument = kSampleOneShotInstrument;
-    fireInstrument.sample = sample;
-    fireSfx = kSampleOneShotSfx;
-    fireSfx.instrument = &fireInstrument;
+    fireSampleInstrument = kSampleOneShotInstrument;
+    fireSampleInstrument.sample = sample;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("hit")) {
-    hitInstrument = kSampleOneShotInstrument;
-    hitInstrument.sample = sample;
-    hitSfx = kSampleOneShotSfx;
-    hitSfx.instrument = &hitInstrument;
+    hitSampleInstrument = kSampleOneShotInstrument;
+    hitSampleInstrument.sample = sample;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("pickup")) {
-    pickupInstrument = kSampleOneShotInstrument;
-    pickupInstrument.sample = sample;
-    pickupSfx = kSampleOneShotSfx;
-    pickupSfx.instrument = &pickupInstrument;
+    pickupSampleInstrument = kSampleOneShotInstrument;
+    pickupSampleInstrument.sample = sample;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("door")) {
-    doorInstrument = kSampleOneShotInstrument;
-    doorInstrument.sample = sample;
-    doorSfx = kSampleOneShotSfx;
-    doorSfx.instrument = &doorInstrument;
+    doorSampleInstrument = kSampleOneShotInstrument;
+    doorSampleInstrument.sample = sample;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("lead")) {
-    leadInstrument = kSamplePitchedInstrument;
-    leadInstrument.sample = sample;
-    leadInstrument.volume = kMusicInstrument.volume;
+    leadSampleInstrument = kSamplePitchedInstrument;
+    leadSampleInstrument.sample = sample;
+    leadSampleInstrument.volume = kMusicInstrument.volume;
+    songLanes[0].player = &samplePlayer;
+    songLanes[0].program = makeProgramRef(leadSampleInstrument);
   }
   if (const AudioSample* sample = WolfAudioSamples::find("bass")) {
-    bassInstrument = kSamplePitchedInstrument;
-    bassInstrument.sample = sample;
-    bassInstrument.volume = kBassInstrument.volume;
+    bassSampleInstrument = kSamplePitchedInstrument;
+    bassSampleInstrument.sample = sample;
+    bassSampleInstrument.volume = kBassInstrument.volume;
+    songLanes[1].player = &samplePlayer;
+    songLanes[1].program = makeProgramRef(bassSampleInstrument);
   }
   if (const AudioSample* sample = WolfAudioSamples::find("hat")) {
-    hatInstrument = kSampleOneShotInstrument;
-    hatInstrument.sample = sample;
-    hatInstrument.volume = kHatInstrument.volume;
+    hatSampleInstrument = kSampleOneShotInstrument;
+    hatSampleInstrument.sample = sample;
+    hatSampleInstrument.volume = kHatInstrument.volume;
+    songLanes[2].player = &samplePlayer;
+    songLanes[2].program = makeProgramRef(hatSampleInstrument);
   }
   if (const AudioSample* sample = WolfAudioSamples::find("snare")) {
-    snareInstrument = kSampleOneShotInstrument;
-    snareInstrument.sample = sample;
-    snareInstrument.volume = kSnareInstrumentFallback.volume;
+    snareSampleInstrument = kSampleOneShotInstrument;
+    snareSampleInstrument.sample = sample;
+    snareSampleInstrument.volume = kSnareInstrumentFallback.volume;
   }
 }
 
@@ -423,42 +418,54 @@ int16_t WolfAudio::renderSample() {
   if (!synthEngine.voiceActive(kLeadVoice)) {
     synthEngine.noteOn(kLeadVoice, kMusicInstrument, 261.63f, 200u);
   }
-  return synthEngine.renderSample();
+  return mixer.renderSample();
 #else
 int16_t WolfAudio::renderSample() {
   songPlayer.tick();
-  return synthEngine.renderSample();
+  return mixer.renderSample();
 }
 #endif
 
-void WolfAudio::playSfx(const Sfx& sfx, float baseHz, uint8_t velocity) {
+void WolfAudio::playSynthSfx(const Sfx& sfx, float baseHz, uint8_t velocity) {
 #if WOLF_AUDIO_DIAG_TONE
   (void)sfx;
   (void)baseHz;
   (void)velocity;
   return;
 #else
-  if (sfx.instrument != nullptr && sfx.instrument->sample != nullptr &&
-      sfx.instrument->sample->rootHz > 0.0f) {
-    baseHz = sfx.instrument->sample->rootHz;
-  }
-  synthEngine.triggerSfx(nextSfxVoice, sfx, baseHz, velocity);
-  nextSfxVoice = static_cast<uint8_t>((nextSfxVoice + 1u) % kSfxVoiceCount);
+  synthEngine.triggerSfx(nextSynthSfxVoice, sfx, baseHz, velocity);
+  nextSynthSfxVoice = static_cast<uint8_t>((nextSynthSfxVoice + 1u) % kSfxVoiceCount);
 #endif
 }
 
 void WolfAudio::playFire() {
-  playSfx(fireSfx, 740.0f, 255u);
+  if (fireSampleInstrument.sample != nullptr) {
+    samplePlayer.playOneShot(fireSampleInstrument, 255u);
+  } else {
+    playSynthSfx(fireSfx, 740.0f, 255u);
+  }
 }
 
 void WolfAudio::playHit() {
-  playSfx(hitSfx, 220.0f, 255u);
+  if (hitSampleInstrument.sample != nullptr) {
+    samplePlayer.playOneShot(hitSampleInstrument, 255u);
+  } else {
+    playSynthSfx(hitSfx, 220.0f, 255u);
+  }
 }
 
 void WolfAudio::playPickup() {
-  playSfx(pickupSfx, 660.0f, 255u);
+  if (pickupSampleInstrument.sample != nullptr) {
+    samplePlayer.playOneShot(pickupSampleInstrument, 255u);
+  } else {
+    playSynthSfx(pickupSfx, 660.0f, 255u);
+  }
 }
 
 void WolfAudio::playDoorOpen() {
-  playSfx(doorSfx, 196.0f, 255u);
+  if (doorSampleInstrument.sample != nullptr) {
+    samplePlayer.playOneShot(doorSampleInstrument, 255u);
+  } else {
+    playSynthSfx(doorSfx, 196.0f, 255u);
+  }
 }
