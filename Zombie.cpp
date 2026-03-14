@@ -1,5 +1,6 @@
 #include "Zombie.h"
 
+#include <Arduino.h>
 #include <math.h>
 #include <string.h>
 
@@ -12,6 +13,7 @@ namespace {
 
 constexpr const char* ZOMBIE_TEXTURE_NAME = "sprite_zombie";
 constexpr const char* ZOMBIE_DEAD_TEXTURE_NAME = "sprite_zombie_dead";
+constexpr const char* GHOST_TEXTURE_NAME = "sprite_ghost";
 
 uint16_t applyAttackTint(uint16_t color565) {
   uint8_t r5 = (color565 >> 11) & 0x1F;
@@ -57,19 +59,25 @@ void Zombie::clear() {
   hp = 0;
   alive = false;
   corpse = false;
+  kind = Kind::Zombie;
+  respawnMode = RespawnMode::None;
   nextShotMs = 0;
   attackUntilMs = 0;
+  respawnAtMs = 0;
   renderSprite.clear();
 }
 
-void Zombie::spawn(float spawnX, float spawnY) {
+void Zombie::spawn(float spawnX, float spawnY, Kind spawnKind, RespawnMode respawn) {
   x = spawnX;
   y = spawnY;
-  hp = MAX_HP;
+  kind = spawnKind;
+  respawnMode = respawn;
+  hp = maxHpForKind();
   alive = true;
   corpse = false;
   nextShotMs = 0;
   attackUntilMs = 0;
+  respawnAtMs = 0;
   renderSprite.configure(x, y, TEX_SIZE, 3, 4, 8, 12.0f, this, buildSpriteTexture);
 }
 
@@ -79,6 +87,10 @@ bool Zombie::isAlive() const {
 
 bool Zombie::hasCorpse() const {
   return corpse;
+}
+
+bool Zombie::isGhost() const {
+  return kind == Kind::Ghost;
 }
 
 float Zombie::getX() const {
@@ -96,7 +108,11 @@ bool Zombie::isAttacking(uint32_t nowMs) const {
 void Zombie::kill() {
   hp = 0;
   alive = false;
-  corpse = true;
+  corpse = (respawnMode == RespawnMode::None);
+  respawnAtMs = (respawnMode == RespawnMode::Auto) ? (millis() + GHOST_RESPAWN_MS) : 0u;
+  if (!corpse) {
+    renderSprite.clear();
+  }
 }
 
 void Zombie::applyDamage(int amount) {
@@ -109,8 +125,9 @@ void Zombie::applyDamage(int amount) {
   }
 }
 
-void Zombie::update(const WorldView& world, int& damageOut, int& shotsOut) {
+void Zombie::update(const WorldView& world, int& damageOut, int& zombieShotsOut, int& ghostAttacksOut) {
   if (!alive) {
+    tryAutoRespawn(world);
     return;
   }
 
@@ -122,7 +139,8 @@ void Zombie::update(const WorldView& world, int& damageOut, int& shotsOut) {
   }
 
   float distance = sqrtf(distanceSq);
-  if (distance > 0.001f && distance > STOP_RANGE) {
+  float stopRange = isGhost() ? GHOST_STOP_RANGE : STOP_RANGE;
+  if (distance > 0.001f && distance > stopRange) {
     float step = MOVE_SPEED * world.delta;
     float moveX = dx / distance * step;
     float moveY = dy / distance * step;
@@ -140,13 +158,22 @@ void Zombie::update(const WorldView& world, int& damageOut, int& shotsOut) {
     }
   }
 
-  if (distance <= SHOOT_RANGE &&
-      world.nowMs >= nextShotMs &&
-      !lineBlocked(world, x, y, world.playerX, world.playerY)) {
-    damageOut += DAMAGE;
-    shotsOut++;
-    attackUntilMs = world.nowMs + ATTACK_FLASH_MS;
-    nextShotMs = world.nowMs + SHOT_COOLDOWN_MS;
+  if (isGhost()) {
+    if (distance <= GHOST_TOUCH_RANGE && world.nowMs >= nextShotMs) {
+      damageOut += DAMAGE;
+      ghostAttacksOut++;
+      attackUntilMs = world.nowMs + ATTACK_FLASH_MS;
+      nextShotMs = world.nowMs + SHOT_COOLDOWN_MS;
+    }
+  } else {
+    if (distance <= SHOOT_RANGE &&
+        world.nowMs >= nextShotMs &&
+        !lineBlocked(world, x, y, world.playerX, world.playerY)) {
+      damageOut += DAMAGE;
+      zombieShotsOut++;
+      attackUntilMs = world.nowMs + ATTACK_FLASH_MS;
+      nextShotMs = world.nowMs + SHOT_COOLDOWN_MS;
+    }
   }
 }
 
@@ -210,7 +237,12 @@ uint16_t Zombie::texel(int texX, int texY, uint32_t nowMs) const {
 
 void Zombie::buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_t nowMs) {
   const Zombie& zombie = *static_cast<const Zombie*>(owner);
-  const char* textureName = zombie.alive ? ZOMBIE_TEXTURE_NAME : ZOMBIE_DEAD_TEXTURE_NAME;
+  const char* textureName = nullptr;
+  if (zombie.alive) {
+    textureName = zombie.kind == Kind::Ghost ? GHOST_TEXTURE_NAME : ZOMBIE_TEXTURE_NAME;
+  } else {
+    textureName = ZOMBIE_DEAD_TEXTURE_NAME;
+  }
   const uint16_t* bmpTexture = Textures::pixels(textureName);
   if (bmpTexture != nullptr) {
     memcpy(outTexture, bmpTexture, TEX_SIZE * TEX_SIZE * sizeof(uint16_t));
@@ -269,12 +301,47 @@ void Zombie::loadSpawns(Zombie* zombies, int& zombieCount, const char* layout) {
       x = 0;
       continue;
     }
-    if (symbol == MAP_SYMBOL && zombieCount < MAX_COUNT) {
-      zombies[zombieCount].spawn(static_cast<float>(x) + 0.5f, static_cast<float>(y) + 0.5f);
+    if ((symbol == MAP_SYMBOL || symbol == GHOST_SYMBOL) && zombieCount < MAX_COUNT) {
+      Zombie::Kind kind = (symbol == GHOST_SYMBOL) ? Kind::Ghost : Kind::Zombie;
+      Zombie::RespawnMode respawn =
+        (symbol == GHOST_SYMBOL) ? RespawnMode::Auto : RespawnMode::None;
+      zombies[zombieCount].spawn(
+        static_cast<float>(x) + 0.5f,
+        static_cast<float>(y) + 0.5f,
+        kind,
+        respawn);
       zombieCount++;
     }
     x++;
   }
+}
+
+void Zombie::tryAutoRespawn(const WorldView& world) {
+  if (respawnMode != RespawnMode::Auto || world.nowMs < respawnAtMs || world.map == nullptr) {
+    return;
+  }
+  for (int attempt = 0; attempt < 64; ++attempt) {
+    int cellX = random(0, world.mapWidth);
+    int cellY = random(0, world.mapHeight);
+    uint8_t tile = world.map[cellY * world.mapStride + cellX];
+    if (tile != 0) {
+      continue;
+    }
+    float spawnX = static_cast<float>(cellX) + 0.5f;
+    float spawnY = static_cast<float>(cellY) + 0.5f;
+    float dx = spawnX - world.playerX;
+    float dy = spawnY - world.playerY;
+    if ((dx * dx + dy * dy) < 4.0f) {
+      continue;
+    }
+    spawn(spawnX, spawnY, kind, respawnMode);
+    return;
+  }
+  respawnAtMs = world.nowMs + 250u;
+}
+
+int Zombie::maxHpForKind() const {
+  return kind == Kind::Ghost ? GHOST_MAX_HP : ZOMBIE_MAX_HP;
 }
 
 bool Zombie::lineBlocked(

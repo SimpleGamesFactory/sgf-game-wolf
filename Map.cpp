@@ -54,6 +54,7 @@ uint8_t Map::decodeTile(char symbol) {
   switch (symbol) {
     case '.': return 0;
     case Zombie::MAP_SYMBOL: return 0;
+    case Zombie::GHOST_SYMBOL: return 0;
     case '#': return 1;
     case 'A': return 2;
     case 'B': return 3;

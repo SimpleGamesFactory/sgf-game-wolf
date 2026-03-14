@@ -25,6 +25,8 @@ public:
   void playDoorOpen();
   void playZombieFire();
   void playZombieDie();
+  void playGhostAttack();
+  void playGhostDie();
 
 private:
   void playSynthSfx(const SGFAudio::Sfx& sfx, float baseHz, uint8_t velocity = 255u);
@@ -39,6 +41,8 @@ private:
   SGFAudio::Instrument doorInstrument{};
   SGFAudio::Instrument zombieFireInstrument{};
   SGFAudio::Instrument zombieDieInstrument{};
+  SGFAudio::Instrument ghostAttackInstrument{};
+  SGFAudio::Instrument ghostDieInstrument{};
   SGFAudio::Instrument leadInstrument{};
   SGFAudio::Instrument bassInstrument{};
   SGFAudio::Instrument hatInstrument{};
@@ -49,6 +53,8 @@ private:
   SGFAudio::SampleInstrument doorSampleInstrument{};
   SGFAudio::SampleInstrument zombieFireSampleInstrument{};
   SGFAudio::SampleInstrument zombieDieSampleInstrument{};
+  SGFAudio::SampleInstrument ghostAttackSampleInstrument{};
+  SGFAudio::SampleInstrument ghostDieSampleInstrument{};
   SGFAudio::SampleInstrument leadSampleInstrument{};
   SGFAudio::SampleInstrument bassSampleInstrument{};
   SGFAudio::SampleInstrument hatSampleInstrument{};
@@ -59,6 +65,8 @@ private:
   SGFAudio::Sfx doorSfx{};
   SGFAudio::Sfx zombieFireSfx{};
   SGFAudio::Sfx zombieDieSfx{};
+  SGFAudio::Sfx ghostAttackSfx{};
+  SGFAudio::Sfx ghostDieSfx{};
   SGFAudio::SongLane songLanes[4]{};
   SGFAudio::Song song{};
   SGFAudio::SongPlayer songPlayer;

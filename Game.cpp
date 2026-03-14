@@ -621,7 +621,11 @@ void Wolf3DGame::shoot() {
     bool wasAlive = zombies[targetIndex].isAlive();
     zombies[targetIndex].applyDamage(shotDamage(bestDistance));
     if (wasAlive && !zombies[targetIndex].isAlive()) {
-      audio.playZombieDie();
+      if (zombies[targetIndex].isGhost()) {
+        audio.playGhostDie();
+      } else {
+        audio.playZombieDie();
+      }
     }
   }
 }
@@ -734,12 +738,16 @@ void Wolf3DGame::updateInput(float delta) {
 void Wolf3DGame::updateZombies(float delta) {
   Zombie::WorldView world = makeZombieWorldView(millis(), delta);
   int damage = 0;
-  int shots = 0;
+  int zombieShots = 0;
+  int ghostAttacks = 0;
   for (int i = 0; i < zombieCount; i++) {
-    zombies[i].update(world, damage, shots);
+    zombies[i].update(world, damage, zombieShots, ghostAttacks);
   }
-  if (shots > 0) {
+  if (zombieShots > 0) {
     audio.playZombieFire();
+  }
+  if (ghostAttacks > 0) {
+    audio.playGhostAttack();
   }
   if (damage > 0) {
     applyDamage(damage);

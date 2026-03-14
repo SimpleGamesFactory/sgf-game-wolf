@@ -174,6 +174,62 @@ constexpr Sfx kZombieDieSfx{
   .stepCount = static_cast<uint8_t>(sizeof(kZombieDieSteps) / sizeof(kZombieDieSteps[0])),
 };
 
+constexpr PitchPoint kGhostAttackPitchEnv[] = {
+  {0u, 240},
+  {90u, -160},
+  {180u, -420},
+};
+
+constexpr Instrument kGhostAttackInstrument{
+  .waveform = Waveform::Triangle,
+  .ampEnv = {0u, 90u, 0u, 80u},
+  .pitchLfo = {.enabled = true, .waveform = Waveform::Sine, .rateHz = 6.0f, .depthCents = 18.0f},
+  .pitchEnv = kGhostAttackPitchEnv,
+  .pitchEnvCount = static_cast<uint8_t>(sizeof(kGhostAttackPitchEnv) / sizeof(kGhostAttackPitchEnv[0])),
+  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .lowPassCutoffHz = 1400.0f,
+  .highPassCutoffHz = 120.0f,
+  .volume = 180u,
+};
+
+constexpr SfxStep kGhostAttackSteps[] = {
+  {180u, -12, 0, 255u, true, true},
+};
+
+constexpr Sfx kGhostAttackSfx{
+  .instrument = &kGhostAttackInstrument,
+  .steps = kGhostAttackSteps,
+  .stepCount = static_cast<uint8_t>(sizeof(kGhostAttackSteps) / sizeof(kGhostAttackSteps[0])),
+};
+
+constexpr PitchPoint kGhostDiePitchEnv[] = {
+  {0u, 220},
+  {120u, -240},
+  {260u, -720},
+};
+
+constexpr Instrument kGhostDieInstrument{
+  .waveform = Waveform::Triangle,
+  .ampEnv = {0u, 120u, 0u, 120u},
+  .pitchLfo = {.enabled = true, .waveform = Waveform::Sine, .rateHz = 5.0f, .depthCents = 24.0f},
+  .pitchEnv = kGhostDiePitchEnv,
+  .pitchEnvCount = static_cast<uint8_t>(sizeof(kGhostDiePitchEnv) / sizeof(kGhostDiePitchEnv[0])),
+  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .lowPassCutoffHz = 1200.0f,
+  .highPassCutoffHz = 100.0f,
+  .volume = 190u,
+};
+
+constexpr SfxStep kGhostDieSteps[] = {
+  {260u, -10, 0, 255u, true, true},
+};
+
+constexpr Sfx kGhostDieSfx{
+  .instrument = &kGhostDieInstrument,
+  .steps = kGhostDieSteps,
+  .stepCount = static_cast<uint8_t>(sizeof(kGhostDieSteps) / sizeof(kGhostDieSteps[0])),
+};
+
 constexpr Instrument kMusicInstrument{
   .waveform = Waveform::Sine,
   .ampEnv = {10u, 40u, 180u, 50u},
@@ -364,6 +420,8 @@ WolfAudio::WolfAudio()
   doorInstrument = kDoorInstrument;
   zombieFireInstrument = kZombieFireInstrument;
   zombieDieInstrument = kZombieDieInstrument;
+  ghostAttackInstrument = kGhostAttackInstrument;
+  ghostDieInstrument = kGhostDieInstrument;
   leadInstrument = kMusicInstrument;
   bassInstrument = kBassInstrument;
   hatInstrument = kHatInstrument;
@@ -374,6 +432,8 @@ WolfAudio::WolfAudio()
   doorSampleInstrument = kSampleOneShotInstrument;
   zombieFireSampleInstrument = kSampleOneShotInstrument;
   zombieDieSampleInstrument = kSampleOneShotInstrument;
+  ghostAttackSampleInstrument = kSampleOneShotInstrument;
+  ghostDieSampleInstrument = kSampleOneShotInstrument;
   leadSampleInstrument = kSamplePitchedInstrument;
   bassSampleInstrument = kSamplePitchedInstrument;
   hatSampleInstrument = kSampleOneShotInstrument;
@@ -394,6 +454,10 @@ WolfAudio::WolfAudio()
   zombieFireSfx.instrument = &zombieFireInstrument;
   zombieDieSfx = kZombieDieSfx;
   zombieDieSfx.instrument = &zombieDieInstrument;
+  ghostAttackSfx = kGhostAttackSfx;
+  ghostAttackSfx.instrument = &ghostAttackInstrument;
+  ghostDieSfx = kGhostDieSfx;
+  ghostDieSfx.instrument = &ghostDieInstrument;
 
   songLanes[0] = {
     .voiceIndex = kLeadVoice,
@@ -455,6 +519,14 @@ void WolfAudio::configureSampleOverrides() {
   if (const AudioSample* sample = WolfAudioSamples::find("zombie_die")) {
     zombieDieSampleInstrument = kSampleOneShotInstrument;
     zombieDieSampleInstrument.sample = sample;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("ghost_attack")) {
+    ghostAttackSampleInstrument = kSampleOneShotInstrument;
+    ghostAttackSampleInstrument.sample = sample;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("ghost_die")) {
+    ghostDieSampleInstrument = kSampleOneShotInstrument;
+    ghostDieSampleInstrument.sample = sample;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("lead")) {
     leadSampleInstrument = kSamplePitchedInstrument;
@@ -554,5 +626,21 @@ void WolfAudio::playZombieDie() {
     samplePlayer.playOneShot(zombieDieSampleInstrument, 255u);
   } else {
     playSynthSfx(zombieDieSfx, 160.0f, 255u);
+  }
+}
+
+void WolfAudio::playGhostAttack() {
+  if (ghostAttackSampleInstrument.sample != nullptr) {
+    samplePlayer.playOneShot(ghostAttackSampleInstrument, 255u);
+  } else {
+    playSynthSfx(ghostAttackSfx, 196.0f, 255u);
+  }
+}
+
+void WolfAudio::playGhostDie() {
+  if (ghostDieSampleInstrument.sample != nullptr) {
+    samplePlayer.playOneShot(ghostDieSampleInstrument, 255u);
+  } else {
+    playSynthSfx(ghostDieSfx, 180.0f, 255u);
   }
 }
