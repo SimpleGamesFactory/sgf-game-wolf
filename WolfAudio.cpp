@@ -7,6 +7,8 @@ namespace {
 constexpr int kSfxVoiceCount = 2;
 constexpr int kLeadVoice = 2;
 constexpr int kBassVoice = 3;
+constexpr int kHatVoice = 4;
+constexpr int kSnareVoice = 5;
 
 constexpr PitchPoint kFirePitchEnv[] = {
   {0u, 500},
@@ -139,122 +141,175 @@ constexpr Instrument kBassInstrument{
   .volume = 118u,
 };
 
-struct MelodyStep {
-  float hz;
-  uint16_t durationMs;
+constexpr Instrument kHatInstrument{
+  .waveform = Waveform::Noise,
+  .ampEnv = {0u, 8u, 0u, 12u},
+  .pitchLfo = {},
+  .pitchEnv = nullptr,
+  .pitchEnvCount = 0u,
+  .filterFlags = static_cast<uint8_t>(FilterHighPass),
+  .lowPassCutoffHz = 0.0f,
+  .highPassCutoffHz = 2600.0f,
+  .volume = 92u,
 };
 
-constexpr MelodyStep kMelody[] = {
-  {261.63f, 180u},  // C4
-  {261.63f, 180u},
-  {329.63f, 180u},  // E4
-  {329.63f, 180u},
-  {349.23f, 180u},  // F4
-  {349.23f, 180u},
-  {369.99f, 180u},  // F#4
-  {392.00f, 180u},  // G4
-  {261.63f, 180u},  // C4
-  {261.63f, 180u},
-  {329.63f, 180u},
-  {329.63f, 180u},
-  {349.23f, 180u},
-  {349.23f, 180u},
-  {369.99f, 180u},
-  {392.00f, 180u},
-  {261.63f, 180u},  // C4
-  {261.63f, 180u},
-  {329.63f, 180u},
-  {329.63f, 180u},
-  {349.23f, 180u},
-  {349.23f, 180u},
-  {369.99f, 180u},
-  {392.00f, 180u},
-  {261.63f, 180u},  // C4
-  {261.63f, 180u},
-  {329.63f, 180u},
-  {329.63f, 180u},
-  {349.23f, 180u},
-  {349.23f, 180u},
-  {369.99f, 180u},
-  {392.00f, 180u},
-  {349.23f, 180u},  // F4
-  {349.23f, 180u},
-  {440.00f, 180u},  // A4
-  {440.00f, 180u},
-  {466.16f, 180u},  // A#4
-  {466.16f, 180u},
-  {493.88f, 180u},  // B4
-  {523.25f, 180u},  // C5
-  {349.23f, 180u},  // F4
-  {349.23f, 180u},
-  {440.00f, 180u},
-  {440.00f, 180u},
-  {466.16f, 180u},
-  {466.16f, 180u},
-  {493.88f, 180u},
-  {523.25f, 180u},
-  {349.23f, 180u},  // F4
-  {349.23f, 180u},
-  {440.00f, 180u},
-  {440.00f, 180u},
-  {466.16f, 180u},
-  {466.16f, 180u},
-  {493.88f, 180u},
-  {523.25f, 180u},
-  {349.23f, 180u},  // F4
-  {349.23f, 180u},
-  {440.00f, 180u},
-  {440.00f, 180u},
-  {466.16f, 180u},
-  {466.16f, 180u},
-  {493.88f, 180u},
-  {523.25f, 180u},
-};
-
-struct BassStep {
-  float hz;
-  uint8_t units;
+constexpr Instrument kSnareInstrument{
+  .waveform = Waveform::Noise,
+  .ampEnv = {0u, 18u, 0u, 28u},
+  .pitchLfo = {},
+  .pitchEnv = nullptr,
+  .pitchEnvCount = 0u,
+  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .lowPassCutoffHz = 2200.0f,
+  .highPassCutoffHz = 700.0f,
+  .volume = 124u,
 };
 
 constexpr uint16_t kBaseStepMs = 180u;
 
-constexpr BassStep kBassLine[] = {
-  {65.41f, 4u},   // C2
-  {65.41f, 1u},   // C2
-  {0.0f,   27u},  // pause
-  {87.31f, 4u},   // F2
-  {87.31f, 1u},
-  {0.0f,   27u},
+constexpr PatternStep kLeadPatternSteps[] = {
+  {261.63f, 1u, 170u},  // C4
+  {261.63f, 1u, 170u},
+  {329.63f, 1u, 170u},  // E4
+  {329.63f, 1u, 170u},
+  {349.23f, 1u, 170u},  // F4
+  {349.23f, 1u, 170u},
+  {369.99f, 1u, 170u},  // F#4
+  {392.00f, 1u, 170u},  // G4
+  {261.63f, 1u, 170u},
+  {261.63f, 1u, 170u},
+  {329.63f, 1u, 170u},
+  {329.63f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {369.99f, 1u, 170u},
+  {392.00f, 1u, 170u},
+  {261.63f, 1u, 170u},
+  {261.63f, 1u, 170u},
+  {329.63f, 1u, 170u},
+  {329.63f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {369.99f, 1u, 170u},
+  {392.00f, 1u, 170u},
+  {261.63f, 1u, 170u},
+  {261.63f, 1u, 170u},
+  {329.63f, 1u, 170u},
+  {329.63f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {369.99f, 1u, 170u},
+  {392.00f, 1u, 170u},
+  {349.23f, 1u, 170u},  // F4
+  {349.23f, 1u, 170u},
+  {440.00f, 1u, 170u},  // A4
+  {440.00f, 1u, 170u},
+  {466.16f, 1u, 170u},  // A#4
+  {466.16f, 1u, 170u},
+  {493.88f, 1u, 170u},  // B4
+  {523.25f, 1u, 170u},  // C5
+  {349.23f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {440.00f, 1u, 170u},
+  {440.00f, 1u, 170u},
+  {466.16f, 1u, 170u},
+  {466.16f, 1u, 170u},
+  {493.88f, 1u, 170u},
+  {523.25f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {440.00f, 1u, 170u},
+  {440.00f, 1u, 170u},
+  {466.16f, 1u, 170u},
+  {466.16f, 1u, 170u},
+  {493.88f, 1u, 170u},
+  {523.25f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {349.23f, 1u, 170u},
+  {440.00f, 1u, 170u},
+  {440.00f, 1u, 170u},
+  {466.16f, 1u, 170u},
+  {466.16f, 1u, 170u},
+  {493.88f, 1u, 170u},
+  {523.25f, 1u, 170u},
+};
+
+constexpr Pattern kLeadPattern{
+  .steps = kLeadPatternSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kLeadPatternSteps) / sizeof(kLeadPatternSteps[0])),
+  .unitMs = kBaseStepMs,
+  .loop = true,
+};
+
+constexpr PatternStep kBassPatternSteps[] = {
+  {65.41f, 4u, 132u},   // C2
+  {65.41f, 1u, 132u},
+  {0.0f,   27u, 0u},    // pause
+  {87.31f, 4u, 132u},   // F2
+  {87.31f, 1u, 132u},
+  {0.0f,   27u, 0u},
+};
+
+constexpr Pattern kBassPattern{
+  .steps = kBassPatternSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternSteps) / sizeof(kBassPatternSteps[0])),
+  .unitMs = kBaseStepMs,
+  .loop = true,
+};
+
+constexpr PatternStep kHatPatternSteps[] = {
+  {1.0f, 1u, 220u},  // H
+  {1.0f, 1u, 132u},  // h
+  {1.0f, 1u, 220u},
+  {1.0f, 1u, 132u},
+  {1.0f, 1u, 220u},
+  {1.0f, 1u, 132u},
+  {1.0f, 1u, 220u},
+  {1.0f, 1u, 132u},
+};
+
+constexpr Pattern kHatPattern{
+  .steps = kHatPatternSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kHatPatternSteps) / sizeof(kHatPatternSteps[0])),
+  .unitMs = kBaseStepMs,
+  .loop = true,
+};
+
+constexpr PatternStep kSnarePatternSteps[] = {
+  {0.0f, 4u, 0u},    // P
+  {1.0f, 4u, 220u},  // S
+};
+
+constexpr Pattern kSnarePattern{
+  .steps = kSnarePatternSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kSnarePatternSteps) / sizeof(kSnarePatternSteps[0])),
+  .unitMs = kBaseStepMs,
+  .loop = true,
 };
 
 }  // namespace
 
 WolfAudio::WolfAudio()
-  : synthEngine(11025u) {
+  : synthEngine(11025u),
+    leadTrack(synthEngine, kLeadVoice, kMusicInstrument, kLeadPattern),
+    bassTrack(synthEngine, kBassVoice, kBassInstrument, kBassPattern),
+    hatTrack(synthEngine, kHatVoice, kHatInstrument, kHatPattern),
+    snareTrack(synthEngine, kSnareVoice, kSnareInstrument, kSnarePattern) {
   synthEngine.setMasterVolume(180u);
 }
 
 #if WOLF_AUDIO_DIAG_TONE
 int16_t WolfAudio::renderSample() {
-  if (leadSamplesRemaining == 0u) {
+  if (!synthEngine.voiceActive(kLeadVoice)) {
     synthEngine.noteOn(kLeadVoice, kMusicInstrument, 261.63f, 200u);
-    leadSamplesRemaining = 1u;
   }
   return synthEngine.renderSample();
 #else
 int16_t WolfAudio::renderSample() {
-  if (leadSamplesRemaining == 0u) {
-    advanceLead();
-  }
-  if (bassSamplesRemaining == 0u) {
-    advanceBass();
-  }
-  if (leadSamplesRemaining > 0u) {
-    leadSamplesRemaining--;
-  }
-  if (bassSamplesRemaining > 0u) {
-    bassSamplesRemaining--;
-  }
+  leadTrack.tick();
+  bassTrack.tick();
+  hatTrack.tick();
+  snareTrack.tick();
   return synthEngine.renderSample();
 }
 #endif
@@ -268,44 +323,6 @@ void WolfAudio::playSfx(const Sfx& sfx, float baseHz, uint8_t velocity) {
 #else
   synthEngine.triggerSfx(nextSfxVoice, sfx, baseHz, velocity);
   nextSfxVoice = static_cast<uint8_t>((nextSfxVoice + 1u) % kSfxVoiceCount);
-#endif
-}
-
-void WolfAudio::advanceLead() {
-#if WOLF_AUDIO_DIAG_TONE
-  leadSamplesRemaining = 1u;
-#else
-  const MelodyStep& step = kMelody[leadStepIndex];
-  if (step.hz > 0.0f) {
-    synthEngine.noteOn(kLeadVoice, kMusicInstrument, step.hz, 170u);
-  } else {
-    synthEngine.noteOff(kLeadVoice);
-  }
-  leadSamplesRemaining = static_cast<uint32_t>(
-    (static_cast<uint64_t>(synthEngine.sampleRate()) * step.durationMs) / 1000u);
-  if (leadSamplesRemaining == 0u) {
-    leadSamplesRemaining = 1u;
-  }
-  leadStepIndex = static_cast<uint8_t>((leadStepIndex + 1u) % (sizeof(kMelody) / sizeof(kMelody[0])));
-#endif
-}
-
-void WolfAudio::advanceBass() {
-#if WOLF_AUDIO_DIAG_TONE
-  bassSamplesRemaining = 1u;
-#else
-  const BassStep& step = kBassLine[bassStepIndex];
-  if (step.hz > 0.0f) {
-    synthEngine.noteOn(kBassVoice, kBassInstrument, step.hz, 132u);
-  } else {
-    synthEngine.noteOff(kBassVoice);
-  }
-  bassSamplesRemaining = static_cast<uint32_t>(
-    (static_cast<uint64_t>(synthEngine.sampleRate()) * (static_cast<uint32_t>(step.units) * kBaseStepMs)) / 1000u);
-  if (bassSamplesRemaining == 0u) {
-    bassSamplesRemaining = 1u;
-  }
-  bassStepIndex = static_cast<uint8_t>((bassStepIndex + 1u) % (sizeof(kBassLine) / sizeof(kBassLine[0])));
 #endif
 }
 
