@@ -181,6 +181,19 @@ constexpr Instrument kSampleOneShotInstrument{
   .volume = 255u,
 };
 
+constexpr Instrument kSamplePitchedInstrument{
+  .waveform = Waveform::Sine,
+  .sample = nullptr,
+  .ampEnv = {0u, 0u, 255u, 0u},
+  .pitchLfo = {},
+  .pitchEnv = nullptr,
+  .pitchEnvCount = 0u,
+  .filterFlags = FilterNone,
+  .lowPassCutoffHz = 0.0f,
+  .highPassCutoffHz = 0.0f,
+  .volume = 180u,
+};
+
 constexpr SfxStep kSampleOneShotSteps[] = {
   {0u, 0, 0, 255u, true, true},
 };
@@ -384,16 +397,24 @@ void WolfAudio::configureSampleOverrides() {
     doorSfx.instrument = &doorInstrument;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("lead")) {
+    leadInstrument = kSamplePitchedInstrument;
     leadInstrument.sample = sample;
+    leadInstrument.volume = kMusicInstrument.volume;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("bass")) {
+    bassInstrument = kSamplePitchedInstrument;
     bassInstrument.sample = sample;
+    bassInstrument.volume = kBassInstrument.volume;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("hat")) {
+    hatInstrument = kSampleOneShotInstrument;
     hatInstrument.sample = sample;
+    hatInstrument.volume = kHatInstrument.volume;
   }
   if (const AudioSample* sample = WolfAudioSamples::find("snare")) {
+    snareInstrument = kSampleOneShotInstrument;
     snareInstrument.sample = sample;
+    snareInstrument.volume = kSnareInstrumentFallback.volume;
   }
 }
 

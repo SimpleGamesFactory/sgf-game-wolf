@@ -1,0 +1,26 @@
+# code [root=Hz]
+#
+# Generator bierze pliki z samples/<code>.wav.
+# Jeśli taki plik istnieje, zostanie użyty. Jeśli nie istnieje, Wolf zostawia
+# obecny fallback synth/sample tam, gdzie już istnieje.
+#
+# Format źródłowy WAV:
+# - PCM bez kompresji
+# - mono
+# - 8-bit albo 16-bit
+# - sample rate dowolny
+# Generator konwertuje to do wewnętrznego 8-bit mono PCM i normalizuje peak do
+# pełnej skali.
+#
+# `root` to częstotliwość referencyjna sample'a:
+# - dla lead/bass ustaw realną nutę bazową sample'a
+# - dla perkusji i one-shot FX zwykle zostaw 1
+
+fire root=1
+hit root=1
+pickup root=1
+door root=1
+lead root=261.63
+bass root=65.41
+hat root=1
+snare root=1
