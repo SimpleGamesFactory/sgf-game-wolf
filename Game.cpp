@@ -534,6 +534,7 @@ bool Wolf3DGame::toggleDoorAhead() {
       setDoorUnlocked(cellX, cellY, true);
     }
     setDoorOpen(cellX, cellY, true);
+    audio.playDoorOpen();
   }
   return true;
 }
@@ -581,6 +582,7 @@ void Wolf3DGame::collectPickupUnderPlayer() {
   }
   if (consumed) {
     map[cellY][cellX] = 0;
+    audio.playPickup();
   }
 }
 
@@ -601,6 +603,7 @@ void Wolf3DGame::shoot() {
   shotUntilMs = nowMs + FACE_SHOOT_MS;
   hud.setAmmo(ammo);
   hud.setFaceMood(currentFaceMood(nowMs));
+  audio.playFire();
 
   Zombie::WorldView world = makeZombieWorldView(nowMs, 0.0f);
   Zombie::AimView aim{world, dirX, dirY};
@@ -624,6 +627,7 @@ void Wolf3DGame::applyDamage(int amount) {
   }
 
   uint32_t nowMs = millis();
+  audio.playHit();
   energy -= amount;
   hurtUntilMs = nowMs + FACE_HURT_MS;
   damageFlashUntilMs = nowMs + DAMAGE_FLASH_MS;

@@ -62,6 +62,7 @@
 #include "SpriteRenderer.h"
 #include "WeaponRenderer.h"
 #include "Walls.h"
+#include "WolfAudio.h"
 #include "WolfProfiler.h"
 #include "Zombie.h"
 
@@ -75,6 +76,7 @@ public:
 
   void setup();
   Profiler& stageProfiler() { return profiler.profiler(); }
+  WolfAudio& audioBank() { return audio; }
 
 private:
   static constexpr uint32_t FRAME_DEFAULT_STEP_US = 16666u;
@@ -205,6 +207,7 @@ private:
   uint32_t hurtUntilMs = 0;
   uint32_t nextDamageMs = 0;
   WolfProfiler profiler;
+  WolfAudio audio;
   Hud hud;
 #if WOLF_HEAP_COLD_BUFFERS
   uint8_t (*map)[MAP_MAX_W] = nullptr;

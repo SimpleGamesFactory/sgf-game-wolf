@@ -15,6 +15,14 @@
 #define SGF_ESP32_ST7789_240X240_USE_DMA_BUS 1
 #endif
 
+#ifndef WOLF_AUDIO_ENABLE
+#define WOLF_AUDIO_ENABLE 1
+#endif
+
+#ifndef WOLF_AUDIO_DAC_PIN
+#define WOLF_AUDIO_DAC_PIN 25
+#endif
+
 #include "SGF.h"
 #include "SGFHardwarePresets.h"
 #include "Game.h"
@@ -22,11 +30,17 @@
 auto hardware = SGFHardwareProfile::makeRuntime();
 Wolf3DGame game(hardware.renderTarget(), hardware.screen(), hardware.profile);
 SerialMonitor serialMonitor(1000u, 115200u);
+#if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_ENABLE
+SGFAudio::ESP32DacSynthOutput audioOutput(game.audioBank().synth(), WOLF_AUDIO_DAC_PIN);
+#endif
 
 void setup() {
   hardware.display.begin(hardware.profile.display.spiHz);
   hardware.display.setRotation(hardware.profile.display.rotation);
   hardware.display.setBacklight(hardware.profile.display.backlightLevel);
+#if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_ENABLE
+  audioOutput.begin();
+#endif
   game.attachSerialMonitor(serialMonitor);
   serialMonitor.attachProfiler(game.stageProfiler());
   game.setup();
