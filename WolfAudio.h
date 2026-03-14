@@ -23,8 +23,23 @@ public:
 
 private:
   void playSfx(const SGFAudio::Sfx& sfx, float baseHz, uint8_t velocity = 255u);
+  void configureSampleOverrides();
 
   SGFAudio::SynthEngine synthEngine;
+  SGFAudio::Instrument fireInstrument{};
+  SGFAudio::Instrument hitInstrument{};
+  SGFAudio::Instrument pickupInstrument{};
+  SGFAudio::Instrument doorInstrument{};
+  SGFAudio::Instrument leadInstrument{};
+  SGFAudio::Instrument bassInstrument{};
+  SGFAudio::Instrument hatInstrument{};
+  SGFAudio::Instrument snareInstrument{};
+  SGFAudio::Sfx fireSfx{};
+  SGFAudio::Sfx hitSfx{};
+  SGFAudio::Sfx pickupSfx{};
+  SGFAudio::Sfx doorSfx{};
+  SGFAudio::SongLane songLanes[4]{};
+  SGFAudio::Song song{};
   SGFAudio::SongPlayer songPlayer;
   uint8_t nextSfxVoice = 0u;
 };

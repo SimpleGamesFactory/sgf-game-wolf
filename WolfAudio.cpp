@@ -1,5 +1,7 @@
 #include "WolfAudio.h"
 
+#include "AudioSamples.h"
+
 using namespace SGFAudio;
 
 namespace {
@@ -153,8 +155,9 @@ constexpr Instrument kHatInstrument{
   .volume = 92u,
 };
 
-constexpr Instrument kSnareInstrument{
+constexpr Instrument kSnareInstrumentFallback{
   .waveform = Waveform::Noise,
+  .sample = &WolfAudioSamples::kSnare,
   .ampEnv = {0u, 18u, 0u, 28u},
   .pitchLfo = {},
   .pitchEnv = nullptr,
@@ -163,6 +166,29 @@ constexpr Instrument kSnareInstrument{
   .lowPassCutoffHz = 2200.0f,
   .highPassCutoffHz = 700.0f,
   .volume = 124u,
+};
+
+constexpr Instrument kSampleOneShotInstrument{
+  .waveform = Waveform::Sine,
+  .sample = nullptr,
+  .ampEnv = {0u, 0u, 255u, 0u},
+  .pitchLfo = {},
+  .pitchEnv = nullptr,
+  .pitchEnvCount = 0u,
+  .filterFlags = FilterNone,
+  .lowPassCutoffHz = 0.0f,
+  .highPassCutoffHz = 0.0f,
+  .volume = 255u,
+};
+
+constexpr SfxStep kSampleOneShotSteps[] = {
+  {0u, 0, 0, 255u, true, true},
+};
+
+constexpr Sfx kSampleOneShotSfx{
+  .instrument = nullptr,
+  .steps = kSampleOneShotSteps,
+  .stepCount = static_cast<uint8_t>(sizeof(kSampleOneShotSteps) / sizeof(kSampleOneShotSteps[0])),
 };
 
 constexpr uint16_t kBaseStepMs = 180u;
@@ -277,28 +303,98 @@ constexpr SongClip kSnareClips[] = {
   {.pattern = &kSnarePattern, .repeats = 8u},
 };
 
-constexpr SongLane kSongLanes[] = {
-  {.voiceIndex = kLeadVoice, .instrument = &kMusicInstrument, .clips = kLeadClips,
-   .clipCount = static_cast<uint16_t>(sizeof(kLeadClips) / sizeof(kLeadClips[0]))},
-  {.voiceIndex = kBassVoice, .instrument = &kBassInstrument, .clips = kBassClips,
-   .clipCount = static_cast<uint16_t>(sizeof(kBassClips) / sizeof(kBassClips[0]))},
-  {.voiceIndex = kHatVoice, .instrument = &kHatInstrument, .clips = kHatClips,
-   .clipCount = static_cast<uint16_t>(sizeof(kHatClips) / sizeof(kHatClips[0]))},
-  {.voiceIndex = kSnareVoice, .instrument = &kSnareInstrument, .clips = kSnareClips,
-   .clipCount = static_cast<uint16_t>(sizeof(kSnareClips) / sizeof(kSnareClips[0]))},
-};
-
-constexpr Song kSong{
-  .lanes = kSongLanes,
-  .laneCount = static_cast<uint8_t>(sizeof(kSongLanes) / sizeof(kSongLanes[0])),
-};
-
 }  // namespace
 
 WolfAudio::WolfAudio()
-  : synthEngine(11025u),
-    songPlayer(synthEngine, kSong) {
+  : synthEngine(11025u) {
   synthEngine.setMasterVolume(180u);
+
+  fireInstrument = kFireInstrument;
+  hitInstrument = kHitInstrument;
+  pickupInstrument = kPickupInstrument;
+  doorInstrument = kDoorInstrument;
+  leadInstrument = kMusicInstrument;
+  bassInstrument = kBassInstrument;
+  hatInstrument = kHatInstrument;
+  snareInstrument = kSnareInstrumentFallback;
+  fireSfx = kFireSfx;
+  fireSfx.instrument = &fireInstrument;
+  hitSfx = kHitSfx;
+  hitSfx.instrument = &hitInstrument;
+  pickupSfx = kPickupSfx;
+  pickupSfx.instrument = &pickupInstrument;
+  doorSfx = kDoorSfx;
+  doorSfx.instrument = &doorInstrument;
+  configureSampleOverrides();
+
+  songLanes[0] = {
+    .voiceIndex = kLeadVoice,
+    .instrument = &leadInstrument,
+    .clips = kLeadClips,
+    .clipCount = static_cast<uint16_t>(sizeof(kLeadClips) / sizeof(kLeadClips[0])),
+  };
+  songLanes[1] = {
+    .voiceIndex = kBassVoice,
+    .instrument = &bassInstrument,
+    .clips = kBassClips,
+    .clipCount = static_cast<uint16_t>(sizeof(kBassClips) / sizeof(kBassClips[0])),
+  };
+  songLanes[2] = {
+    .voiceIndex = kHatVoice,
+    .instrument = &hatInstrument,
+    .clips = kHatClips,
+    .clipCount = static_cast<uint16_t>(sizeof(kHatClips) / sizeof(kHatClips[0])),
+  };
+  songLanes[3] = {
+    .voiceIndex = kSnareVoice,
+    .instrument = &snareInstrument,
+    .clips = kSnareClips,
+    .clipCount = static_cast<uint16_t>(sizeof(kSnareClips) / sizeof(kSnareClips[0])),
+  };
+  song = {
+    .lanes = songLanes,
+    .laneCount = static_cast<uint8_t>(sizeof(songLanes) / sizeof(songLanes[0])),
+  };
+  songPlayer.bind(synthEngine, song);
+}
+
+void WolfAudio::configureSampleOverrides() {
+  if (const AudioSample* sample = WolfAudioSamples::find("fire")) {
+    fireInstrument = kSampleOneShotInstrument;
+    fireInstrument.sample = sample;
+    fireSfx = kSampleOneShotSfx;
+    fireSfx.instrument = &fireInstrument;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("hit")) {
+    hitInstrument = kSampleOneShotInstrument;
+    hitInstrument.sample = sample;
+    hitSfx = kSampleOneShotSfx;
+    hitSfx.instrument = &hitInstrument;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("pickup")) {
+    pickupInstrument = kSampleOneShotInstrument;
+    pickupInstrument.sample = sample;
+    pickupSfx = kSampleOneShotSfx;
+    pickupSfx.instrument = &pickupInstrument;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("door")) {
+    doorInstrument = kSampleOneShotInstrument;
+    doorInstrument.sample = sample;
+    doorSfx = kSampleOneShotSfx;
+    doorSfx.instrument = &doorInstrument;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("lead")) {
+    leadInstrument.sample = sample;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("bass")) {
+    bassInstrument.sample = sample;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("hat")) {
+    hatInstrument.sample = sample;
+  }
+  if (const AudioSample* sample = WolfAudioSamples::find("snare")) {
+    snareInstrument.sample = sample;
+  }
 }
 
 #if WOLF_AUDIO_DIAG_TONE
@@ -321,23 +417,27 @@ void WolfAudio::playSfx(const Sfx& sfx, float baseHz, uint8_t velocity) {
   (void)velocity;
   return;
 #else
+  if (sfx.instrument != nullptr && sfx.instrument->sample != nullptr &&
+      sfx.instrument->sample->rootHz > 0.0f) {
+    baseHz = sfx.instrument->sample->rootHz;
+  }
   synthEngine.triggerSfx(nextSfxVoice, sfx, baseHz, velocity);
   nextSfxVoice = static_cast<uint8_t>((nextSfxVoice + 1u) % kSfxVoiceCount);
 #endif
 }
 
 void WolfAudio::playFire() {
-  playSfx(kFireSfx, 740.0f, 255u);
+  playSfx(fireSfx, 740.0f, 255u);
 }
 
 void WolfAudio::playHit() {
-  playSfx(kHitSfx, 220.0f, 255u);
+  playSfx(hitSfx, 220.0f, 255u);
 }
 
 void WolfAudio::playPickup() {
-  playSfx(kPickupSfx, 660.0f, 255u);
+  playSfx(pickupSfx, 660.0f, 255u);
 }
 
 void WolfAudio::playDoorOpen() {
-  playSfx(kDoorSfx, 196.0f, 255u);
+  playSfx(doorSfx, 196.0f, 255u);
 }
