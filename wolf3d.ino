@@ -31,7 +31,7 @@ auto hardware = SGFHardwareProfile::makeRuntime();
 Wolf3DGame game(hardware.renderTarget(), hardware.screen(), hardware.profile);
 SerialMonitor serialMonitor(1000u, 115200u);
 #if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_ENABLE
-SGFAudio::ESP32DacSynthOutput audioOutput(game.audioBank().synth(), WOLF_AUDIO_DAC_PIN);
+SGFAudio::ESP32DacSynthOutput audioOutput(game.audioBank(), WOLF_AUDIO_DAC_PIN);
 #endif
 
 void setup() {
