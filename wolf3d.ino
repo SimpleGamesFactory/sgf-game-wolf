@@ -15,12 +15,24 @@
 #define SGF_ESP32_ST7789_240X240_USE_DMA_BUS 1
 #endif
 
+#ifndef ENABLE_AUDIO
+#define ENABLE_AUDIO 1
+#endif
+
 #ifndef WOLF_AUDIO_ENABLE
-#define WOLF_AUDIO_ENABLE 1
+#define WOLF_AUDIO_ENABLE ENABLE_AUDIO
 #endif
 
 #ifndef WOLF_AUDIO_DAC_PIN
 #define WOLF_AUDIO_DAC_PIN 25
+#endif
+
+#ifndef WOLF_AUDIO_SILENT_SOURCE
+#define WOLF_AUDIO_SILENT_SOURCE 0
+#endif
+
+#ifndef WOLF_AUDIO_DAC_TIMER_TEST
+#define WOLF_AUDIO_DAC_TIMER_TEST 0
 #endif
 
 #include "SGF.h"
@@ -31,7 +43,68 @@ auto hardware = SGFHardwareProfile::makeRuntime();
 Wolf3DGame game(hardware.renderTarget(), hardware.screen(), hardware.profile);
 SerialMonitor serialMonitor(1000u, 115200u);
 #if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_ENABLE
+#if WOLF_AUDIO_DAC_TIMER_TEST
+class DacTimerSilenceTestOutput {
+public:
+  explicit DacTimerSilenceTestOutput(uint8_t pinRef) : pin(pinRef) {}
+
+  bool begin() {
+    if (began) {
+      return true;
+    }
+    began = true;
+    dacWrite(pin, 128u);
+#if WOLF_AUDIO_DAC_TIMER_TEST == 1
+    timer = timerBegin(11025u);
+    if (timer == nullptr) {
+      began = false;
+      return false;
+    }
+    timerAttachInterruptArg(timer, &DacTimerSilenceTestOutput::onTimerThunk, this);
+    timerAlarm(timer, 1u, true, 0u);
+#endif
+    return true;
+  }
+
+  void end() {
+    if (timer != nullptr) {
+      timerEnd(timer);
+      timer = nullptr;
+    }
+    began = false;
+    dacWrite(pin, 128u);
+  }
+
+  bool attachSerialMonitor(SerialMonitor&) { return false; }
+
+private:
+  static void onTimerThunk(void* arg) {
+    if (arg == nullptr) {
+      return;
+    }
+    static_cast<DacTimerSilenceTestOutput*>(arg)->onTimer();
+  }
+
+  void onTimer() { dacWrite(pin, 128u); }
+
+  uint8_t pin = 25u;
+  bool began = false;
+  hw_timer_t* timer = nullptr;
+};
+
+DacTimerSilenceTestOutput audioOutput(WOLF_AUDIO_DAC_PIN);
+#elif WOLF_AUDIO_SILENT_SOURCE
+class SilentAudioSource : public SGFAudio::IAudioSource {
+public:
+  uint32_t sampleRate() const override { return 11025u; }
+  int16_t renderSample() override { return 0; }
+};
+
+SilentAudioSource silentAudioSource;
+SGFAudio::ESP32DacSynthOutput audioOutput(silentAudioSource, WOLF_AUDIO_DAC_PIN);
+#else
 SGFAudio::ESP32DacSynthOutput audioOutput(game.audioBank(), WOLF_AUDIO_DAC_PIN);
+#endif
 #endif
 
 void setup() {

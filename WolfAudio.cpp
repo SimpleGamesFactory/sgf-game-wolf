@@ -21,12 +21,10 @@ constexpr PitchPoint kFirePitchEnv[] = {
 constexpr Instrument kFireInstrument{
   .waveform = Waveform::Square,
   .ampEnv = {1u, 18u, 0u, 25u},
-  .pitchLfo = {},
   .pitchEnv = kFirePitchEnv,
   .pitchEnvCount = static_cast<uint8_t>(sizeof(kFirePitchEnv) / sizeof(kFirePitchEnv[0])),
-  .filterFlags = static_cast<uint8_t>(FilterLowPass),
+  .filterFlags = AUDIO_FILTER_LP,
   .lowPassCutoffHz = 1700.0f,
-  .highPassCutoffHz = 0.0f,
   .volume = 215u,
 };
 
@@ -48,10 +46,9 @@ constexpr PitchPoint kHitPitchEnv[] = {
 constexpr Instrument kHitInstrument{
   .waveform = Waveform::Triangle,
   .ampEnv = {0u, 40u, 0u, 45u},
-  .pitchLfo = {},
   .pitchEnv = kHitPitchEnv,
   .pitchEnvCount = static_cast<uint8_t>(sizeof(kHitPitchEnv) / sizeof(kHitPitchEnv[0])),
-  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1300.0f,
   .highPassCutoffHz = 120.0f,
   .volume = 190u,
@@ -70,12 +67,8 @@ constexpr Sfx kHitSfx{
 constexpr Instrument kPickupInstrument{
   .waveform = Waveform::Sine,
   .ampEnv = {0u, 20u, 0u, 20u},
-  .pitchLfo = {},
-  .pitchEnv = nullptr,
-  .pitchEnvCount = 0u,
-  .filterFlags = static_cast<uint8_t>(FilterLowPass),
+  .filterFlags = AUDIO_FILTER_LP,
   .lowPassCutoffHz = 3200.0f,
-  .highPassCutoffHz = 0.0f,
   .volume = 220u,
 };
 
@@ -99,12 +92,10 @@ constexpr PitchPoint kDoorPitchEnv[] = {
 constexpr Instrument kDoorInstrument{
   .waveform = Waveform::Triangle,
   .ampEnv = {3u, 120u, 110u, 70u},
-  .pitchLfo = {},
   .pitchEnv = kDoorPitchEnv,
   .pitchEnvCount = static_cast<uint8_t>(sizeof(kDoorPitchEnv) / sizeof(kDoorPitchEnv[0])),
-  .filterFlags = static_cast<uint8_t>(FilterLowPass),
+  .filterFlags = AUDIO_FILTER_LP,
   .lowPassCutoffHz = 1200.0f,
-  .highPassCutoffHz = 0.0f,
   .volume = 245u,
 };
 
@@ -127,10 +118,9 @@ constexpr PitchPoint kZombieFirePitchEnv[] = {
 constexpr Instrument kZombieFireInstrument{
   .waveform = Waveform::Square,
   .ampEnv = {0u, 24u, 0u, 24u},
-  .pitchLfo = {},
   .pitchEnv = kZombieFirePitchEnv,
   .pitchEnvCount = static_cast<uint8_t>(sizeof(kZombieFirePitchEnv) / sizeof(kZombieFirePitchEnv[0])),
-  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1500.0f,
   .highPassCutoffHz = 160.0f,
   .volume = 180u,
@@ -155,10 +145,9 @@ constexpr PitchPoint kZombieDiePitchEnv[] = {
 constexpr Instrument kZombieDieInstrument{
   .waveform = Waveform::Noise,
   .ampEnv = {0u, 70u, 0u, 90u},
-  .pitchLfo = {},
   .pitchEnv = kZombieDiePitchEnv,
   .pitchEnvCount = static_cast<uint8_t>(sizeof(kZombieDiePitchEnv) / sizeof(kZombieDiePitchEnv[0])),
-  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1800.0f,
   .highPassCutoffHz = 110.0f,
   .volume = 190u,
@@ -186,7 +175,7 @@ constexpr Instrument kGhostAttackInstrument{
   .pitchLfo = {.enabled = true, .waveform = Waveform::Sine, .rateHz = 6.0f, .depthCents = 18.0f},
   .pitchEnv = kGhostAttackPitchEnv,
   .pitchEnvCount = static_cast<uint8_t>(sizeof(kGhostAttackPitchEnv) / sizeof(kGhostAttackPitchEnv[0])),
-  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1400.0f,
   .highPassCutoffHz = 120.0f,
   .volume = 180u,
@@ -214,7 +203,7 @@ constexpr Instrument kGhostDieInstrument{
   .pitchLfo = {.enabled = true, .waveform = Waveform::Sine, .rateHz = 5.0f, .depthCents = 24.0f},
   .pitchEnv = kGhostDiePitchEnv,
   .pitchEnvCount = static_cast<uint8_t>(sizeof(kGhostDiePitchEnv) / sizeof(kGhostDiePitchEnv[0])),
-  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1200.0f,
   .highPassCutoffHz = 100.0f,
   .volume = 190u,
@@ -233,35 +222,23 @@ constexpr Sfx kGhostDieSfx{
 constexpr Instrument kMusicInstrument{
   .waveform = Waveform::Sine,
   .ampEnv = {10u, 40u, 180u, 50u},
-  .pitchLfo = {},
-  .pitchEnv = nullptr,
-  .pitchEnvCount = 0u,
-  .filterFlags = static_cast<uint8_t>(FilterLowPass),
+  .filterFlags = AUDIO_FILTER_LP,
   .lowPassCutoffHz = 1800.0f,
-  .highPassCutoffHz = 0.0f,
   .volume = 75u,
 };
 
 constexpr Instrument kBassInstrument{
   .waveform = Waveform::Saw,
   .ampEnv = {4u, 20u, 170u, 35u},
-  .pitchLfo = {},
-  .pitchEnv = nullptr,
-  .pitchEnvCount = 0u,
-  .filterFlags = FilterNone,
-  .lowPassCutoffHz = 0.0f,
-  .highPassCutoffHz = 0.0f,
-  .volume = 59u,
+  .filterFlags = AUDIO_FILTER_LP,
+  .lowPassCutoffHz = 300.0f,
+  .volume = 40u,
 };
 
 constexpr Instrument kHatInstrument{
   .waveform = Waveform::Noise,
   .ampEnv = {0u, 8u, 0u, 12u},
-  .pitchLfo = {},
-  .pitchEnv = nullptr,
-  .pitchEnvCount = 0u,
-  .filterFlags = static_cast<uint8_t>(FilterHighPass),
-  .lowPassCutoffHz = 0.0f,
+  .filterFlags = AUDIO_FILTER_HP,
   .highPassCutoffHz = 2600.0f,
   .volume = 66u,
 };
@@ -269,23 +246,15 @@ constexpr Instrument kHatInstrument{
 constexpr Instrument kSnareInstrumentFallback{
   .waveform = Waveform::Noise,
   .ampEnv = {0u, 18u, 0u, 28u},
-  .pitchLfo = {},
-  .pitchEnv = nullptr,
-  .pitchEnvCount = 0u,
-  .filterFlags = static_cast<uint8_t>(FilterLowPass | FilterHighPass),
+  .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 2200.0f,
   .highPassCutoffHz = 700.0f,
   .volume = 32u,
 };
 
-constexpr SampleInstrument kSampleOneShotInstrument{
-  .sample = nullptr,
-  .volume = 255u,
-  .oneShot = true,
-};
+constexpr SampleInstrument kSampleOneShotInstrument{};
 
 constexpr SampleInstrument kSamplePitchedInstrument{
-  .sample = nullptr,
   .volume = 180u,
   .oneShot = false,
 };
@@ -452,7 +421,6 @@ WolfAudio::WolfAudio()
   snareSampleInstrument = {
     .sample = &WolfAudioSamples::kSnare,
     .volume = kSnareInstrumentFallback.volume,
-    .oneShot = true,
   };
   fireSfx = kFireSfx;
   fireSfx.instrument = &fireInstrument;
@@ -567,7 +535,9 @@ int16_t WolfAudio::renderSample() {
   return mixer.renderSample();
 #else
 int16_t WolfAudio::renderSample() {
+#if WOLF_AUDIO_ENABLE_MUSIC
   songPlayer.tick();
+#endif
   return mixer.renderSample();
 }
 #endif

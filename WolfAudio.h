@@ -4,6 +4,10 @@
 #define WOLF_AUDIO_DIAG_TONE 0
 #endif
 
+#ifndef WOLF_AUDIO_ENABLE_MUSIC
+#define WOLF_AUDIO_ENABLE_MUSIC 1
+#endif
+
 #include "SGF/AudioMixer.h"
 #include "SGF/AudioTypes.h"
 #include "SGF/SamplePlayer.h"

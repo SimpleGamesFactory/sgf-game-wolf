@@ -20,3 +20,5 @@ Minimal C++/Arduino guidelines for this repo:
 - Reuse common math/value types (e.g. `Vector2` for 2D position/size) instead of duplicating one-off `Position`/`Size` structs across classes.
 - If object state change has invariants/side effects (e.g. syncing a bound sprite), the state must be changed through the object API (`setPosition`, `setX`, etc.), not by external direct field mutation.
 - Do not add central "sync all objects" sweeps to compensate for leaked state mutation. Update dependent state at the point where the owning object state changes.
+- Stop generating fucking bloat code.
+- When a struct/class already has sane defaults, initialize only the non-default fields; do not restate `nullptr`, `0`, empty structs, or default enum/flag values without a real reason.

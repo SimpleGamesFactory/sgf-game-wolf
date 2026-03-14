@@ -6,6 +6,8 @@
 - If a change spans multiple areas of a file, briefly state what will be altered before editing.
 - Prefer small, precise patches over sweeping rewrites.
 - Keep the project’s style/structure; do not impose your own organization unasked.
+- Stop generating fucking bloat code.
+- If a type already has sane defaults, set only the fields that differ; do not bloat config objects with redundant `0`/`nullptr`/empty/default assignments.
 - Follow [CODING_STANDARDS.md](/home/marcin/Arduino/Wolf/CODING_STANDARDS.md) for any C++/Arduino code changes.
 - Treat `CODING_STANDARDS.md` as mandatory, not advisory.
 - Keep Wolf-specific defaults and overrides in the Wolf project, not in shared `vendor/SGF` profiles or APIs.
