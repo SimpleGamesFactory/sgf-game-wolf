@@ -167,7 +167,7 @@ constexpr Instrument kSnareInstrument{
 
 constexpr uint16_t kBaseStepMs = 180u;
 
-constexpr PatternStep kLeadPatternSteps[] = {
+constexpr PatternStep kLeadPatternASteps[] = {
   {261.63f, 1u, 170u},  // C4
   {261.63f, 1u, 170u},
   {329.63f, 1u, 170u},  // E4
@@ -176,30 +176,16 @@ constexpr PatternStep kLeadPatternSteps[] = {
   {349.23f, 1u, 170u},
   {369.99f, 1u, 170u},  // F#4
   {392.00f, 1u, 170u},  // G4
-  {261.63f, 1u, 170u},
-  {261.63f, 1u, 170u},
-  {329.63f, 1u, 170u},
-  {329.63f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {369.99f, 1u, 170u},
-  {392.00f, 1u, 170u},
-  {261.63f, 1u, 170u},
-  {261.63f, 1u, 170u},
-  {329.63f, 1u, 170u},
-  {329.63f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {369.99f, 1u, 170u},
-  {392.00f, 1u, 170u},
-  {261.63f, 1u, 170u},
-  {261.63f, 1u, 170u},
-  {329.63f, 1u, 170u},
-  {329.63f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {369.99f, 1u, 170u},
-  {392.00f, 1u, 170u},
+};
+
+constexpr Pattern kLeadPatternA{
+  .steps = kLeadPatternASteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kLeadPatternASteps) / sizeof(kLeadPatternASteps[0])),
+  .unitMs = kBaseStepMs,
+  .loop = false,
+};
+
+constexpr PatternStep kLeadPatternBSteps[] = {
   {349.23f, 1u, 170u},  // F4
   {349.23f, 1u, 170u},
   {440.00f, 1u, 170u},  // A4
@@ -208,53 +194,39 @@ constexpr PatternStep kLeadPatternSteps[] = {
   {466.16f, 1u, 170u},
   {493.88f, 1u, 170u},  // B4
   {523.25f, 1u, 170u},  // C5
-  {349.23f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {440.00f, 1u, 170u},
-  {440.00f, 1u, 170u},
-  {466.16f, 1u, 170u},
-  {466.16f, 1u, 170u},
-  {493.88f, 1u, 170u},
-  {523.25f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {440.00f, 1u, 170u},
-  {440.00f, 1u, 170u},
-  {466.16f, 1u, 170u},
-  {466.16f, 1u, 170u},
-  {493.88f, 1u, 170u},
-  {523.25f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {349.23f, 1u, 170u},
-  {440.00f, 1u, 170u},
-  {440.00f, 1u, 170u},
-  {466.16f, 1u, 170u},
-  {466.16f, 1u, 170u},
-  {493.88f, 1u, 170u},
-  {523.25f, 1u, 170u},
 };
 
-constexpr Pattern kLeadPattern{
-  .steps = kLeadPatternSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kLeadPatternSteps) / sizeof(kLeadPatternSteps[0])),
+constexpr Pattern kLeadPatternB{
+  .steps = kLeadPatternBSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kLeadPatternBSteps) / sizeof(kLeadPatternBSteps[0])),
   .unitMs = kBaseStepMs,
-  .loop = true,
+  .loop = false,
 };
 
-constexpr PatternStep kBassPatternSteps[] = {
+constexpr PatternStep kBassPatternCSteps[] = {
   {65.41f, 4u, 132u},   // C2
   {65.41f, 1u, 132u},
   {0.0f,   27u, 0u},    // pause
+};
+
+constexpr Pattern kBassPatternC{
+  .steps = kBassPatternCSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternCSteps) / sizeof(kBassPatternCSteps[0])),
+  .unitMs = kBaseStepMs,
+  .loop = false,
+};
+
+constexpr PatternStep kBassPatternFSteps[] = {
   {87.31f, 4u, 132u},   // F2
   {87.31f, 1u, 132u},
   {0.0f,   27u, 0u},
 };
 
-constexpr Pattern kBassPattern{
-  .steps = kBassPatternSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternSteps) / sizeof(kBassPatternSteps[0])),
+constexpr Pattern kBassPatternF{
+  .steps = kBassPatternFSteps,
+  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternFSteps) / sizeof(kBassPatternFSteps[0])),
   .unitMs = kBaseStepMs,
-  .loop = true,
+  .loop = false,
 };
 
 constexpr PatternStep kHatPatternSteps[] = {
@@ -272,7 +244,7 @@ constexpr Pattern kHatPattern{
   .steps = kHatPatternSteps,
   .stepCount = static_cast<uint16_t>(sizeof(kHatPatternSteps) / sizeof(kHatPatternSteps[0])),
   .unitMs = kBaseStepMs,
-  .loop = true,
+  .loop = false,
 };
 
 constexpr PatternStep kSnarePatternSteps[] = {
@@ -284,17 +256,48 @@ constexpr Pattern kSnarePattern{
   .steps = kSnarePatternSteps,
   .stepCount = static_cast<uint16_t>(sizeof(kSnarePatternSteps) / sizeof(kSnarePatternSteps[0])),
   .unitMs = kBaseStepMs,
-  .loop = true,
+  .loop = false,
+};
+
+constexpr SongClip kLeadClips[] = {
+  {.pattern = &kLeadPatternA, .repeats = 4u},
+  {.pattern = &kLeadPatternB, .repeats = 4u},
+};
+
+constexpr SongClip kBassClips[] = {
+  {.pattern = &kBassPatternC, .repeats = 1u},
+  {.pattern = &kBassPatternF, .repeats = 1u},
+};
+
+constexpr SongClip kHatClips[] = {
+  {.pattern = &kHatPattern, .repeats = 8u},
+};
+
+constexpr SongClip kSnareClips[] = {
+  {.pattern = &kSnarePattern, .repeats = 8u},
+};
+
+constexpr SongLane kSongLanes[] = {
+  {.voiceIndex = kLeadVoice, .instrument = &kMusicInstrument, .clips = kLeadClips,
+   .clipCount = static_cast<uint16_t>(sizeof(kLeadClips) / sizeof(kLeadClips[0]))},
+  {.voiceIndex = kBassVoice, .instrument = &kBassInstrument, .clips = kBassClips,
+   .clipCount = static_cast<uint16_t>(sizeof(kBassClips) / sizeof(kBassClips[0]))},
+  {.voiceIndex = kHatVoice, .instrument = &kHatInstrument, .clips = kHatClips,
+   .clipCount = static_cast<uint16_t>(sizeof(kHatClips) / sizeof(kHatClips[0]))},
+  {.voiceIndex = kSnareVoice, .instrument = &kSnareInstrument, .clips = kSnareClips,
+   .clipCount = static_cast<uint16_t>(sizeof(kSnareClips) / sizeof(kSnareClips[0]))},
+};
+
+constexpr Song kSong{
+  .lanes = kSongLanes,
+  .laneCount = static_cast<uint8_t>(sizeof(kSongLanes) / sizeof(kSongLanes[0])),
 };
 
 }  // namespace
 
 WolfAudio::WolfAudio()
   : synthEngine(11025u),
-    leadTrack(synthEngine, kLeadVoice, kMusicInstrument, kLeadPattern),
-    bassTrack(synthEngine, kBassVoice, kBassInstrument, kBassPattern),
-    hatTrack(synthEngine, kHatVoice, kHatInstrument, kHatPattern),
-    snareTrack(synthEngine, kSnareVoice, kSnareInstrument, kSnarePattern) {
+    songPlayer(synthEngine, kSong) {
   synthEngine.setMasterVolume(180u);
 }
 
@@ -306,10 +309,7 @@ int16_t WolfAudio::renderSample() {
   return synthEngine.renderSample();
 #else
 int16_t WolfAudio::renderSample() {
-  leadTrack.tick();
-  bassTrack.tick();
-  hatTrack.tick();
-  snareTrack.tick();
+  songPlayer.tick();
   return synthEngine.renderSample();
 }
 #endif

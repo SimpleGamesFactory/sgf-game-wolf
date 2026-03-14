@@ -4,7 +4,7 @@
 #define WOLF_AUDIO_DIAG_TONE 0
 #endif
 
-#include "SGF/Pattern.h"
+#include "SGF/Song.h"
 #include "SGF/Synth.h"
 
 class WolfAudio : public SGFAudio::IAudioSource {
@@ -25,9 +25,6 @@ private:
   void playSfx(const SGFAudio::Sfx& sfx, float baseHz, uint8_t velocity = 255u);
 
   SGFAudio::SynthEngine synthEngine;
-  SGFAudio::PatternTrack leadTrack;
-  SGFAudio::PatternTrack bassTrack;
-  SGFAudio::PatternTrack hatTrack;
-  SGFAudio::PatternTrack snareTrack;
+  SGFAudio::SongPlayer songPlayer;
   uint8_t nextSfxVoice = 0u;
 };
