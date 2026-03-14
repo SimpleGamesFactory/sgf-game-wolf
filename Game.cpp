@@ -820,6 +820,10 @@ void Wolf3DGame::renderFrame() {
 }
 
 void Wolf3DGame::presentFrame() {
+  if (!LCD_TRANSFER) {
+    return;
+  }
+
   uint16_t* fb = frameBuffer;
   uint32_t nowMs = millis();
   uint8_t hitFlashStrength = damageFlashStrength(nowMs, damageFlashUntilMs, DAMAGE_FLASH_MS);

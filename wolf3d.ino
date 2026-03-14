@@ -40,6 +40,7 @@ void setup() {
   hardware.display.setBacklight(hardware.profile.display.backlightLevel);
 #if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_ENABLE
   audioOutput.begin();
+  audioOutput.attachSerialMonitor(serialMonitor);
 #endif
   game.attachSerialMonitor(serialMonitor);
   serialMonitor.attachProfiler(game.stageProfiler());

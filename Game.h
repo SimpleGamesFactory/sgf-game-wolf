@@ -46,6 +46,10 @@
 #define WOLF_HEAP_COLD_BUFFERS 1
 #endif
 
+#ifndef WOLF_LCD_TRANSFER
+#define WOLF_LCD_TRANSFER 1
+#endif
+
 #include "SGF/ActionState.h"
 #include "SGF/IFillRect.h"
 #include "SGF/Font5x7.h"
@@ -94,6 +98,7 @@ private:
   static constexpr int UPSCALE_CHUNK_SRC_ROWS = 3;
   static constexpr int UPSCALE_BUFFER_COUNT = WOLF_UPSCALE_BUFFER_COUNT;
   static constexpr bool SIMPLE_FLOOR = WOLF_SIMPLE_FLOOR != 0;
+  static constexpr bool LCD_TRANSFER = WOLF_LCD_TRANSFER != 0;
   static constexpr int RENDER_W = VIEWPORT_W / UPSCALE;
   static constexpr int RENDER_H = VIEWPORT_H / UPSCALE;
   static_assert(UPSCALE >= 1 && UPSCALE <= 4, "WOLF_UPSCALE must be 1..4");

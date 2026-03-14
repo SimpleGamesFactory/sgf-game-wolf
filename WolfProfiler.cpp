@@ -7,7 +7,7 @@ constexpr int SLOT_COUNT = static_cast<int>(WolfProfiler::Slot::Count);
 }  // namespace
 
 WolfProfiler::WolfProfiler()
-  : stageProfiler("prof", profilerSlots, static_cast<uint8_t>(Slot::Count)) {}
+  : stageProfiler("wolf", profilerSlots, static_cast<uint8_t>(Slot::Count)) {}
 
 void WolfProfiler::begin() {
   if (initialized) {
