@@ -1,6 +1,6 @@
-#include "AudioSamplesGenerated.h"
+#include "SamplesGenerated.h"
 
-namespace AudioSamplesGenerated {
+namespace SamplesGenerated {
 
 static const int8_t pcm_door[] = {
   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,

@@ -78,14 +78,18 @@
   - [WeaponRenderer.cpp](/home/marcin/Arduino/Wolf/WeaponRenderer.cpp)
   - [Pickups.cpp](/home/marcin/Arduino/Wolf/Pickups.cpp)
   - [Enemy.cpp](/home/marcin/Arduino/Wolf/Enemy.cpp)
-- Build-time generator:
-  - [tools/generate_textures.py](/home/marcin/Arduino/Wolf/tools/generate_textures.py)
+- Build-time generators live in shared SGF tools:
+  - [generate_textures.py](/home/marcin/Arduino/Wolf/vendor/SGF/tools/generate_textures.py)
+  - [generate_samples.py](/home/marcin/Arduino/Wolf/vendor/SGF/tools/generate_samples.py)
+- `sgf build` runs asset prebuild automatically when `textures/` and/or `samples/` are present.
 - Palette source of truth:
   - [textures/wolf-128.gpl](/home/marcin/Arduino/Wolf/textures/wolf-128.gpl)
   - generator reads `.gpl`; it is not just an export artifact
 - Generated assets:
   - [TexturesGenerated.h](/home/marcin/Arduino/Wolf/TexturesGenerated.h)
   - [TexturesGenerated.cpp](/home/marcin/Arduino/Wolf/TexturesGenerated.cpp)
+  - [SamplesGenerated.h](/home/marcin/Arduino/Wolf/SamplesGenerated.h)
+  - [SamplesGenerated.cpp](/home/marcin/Arduino/Wolf/SamplesGenerated.cpp)
 - Current texture blob format is flash-backed and lazy-decoded by `Textures`.
 
 ## Indexed BMP rules

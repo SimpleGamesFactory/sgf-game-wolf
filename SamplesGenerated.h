@@ -4,7 +4,7 @@
 
 #include "SGF/Synth.h"
 
-namespace AudioSamplesGenerated {
+namespace SamplesGenerated {
 
 struct Entry {
   const char* code;

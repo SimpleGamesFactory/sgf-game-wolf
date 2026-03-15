@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-#include "AudioSamplesGenerated.h"
+#include "SamplesGenerated.h"
 
 namespace WolfAudioSamples {
 
@@ -39,8 +39,8 @@ const SGFAudio::AudioSample* find(const char* code) {
   if (code == nullptr || *code == '\0') {
     return nullptr;
   }
-  for (unsigned int i = 0; i < AudioSamplesGenerated::ENTRY_COUNT; ++i) {
-    const AudioSamplesGenerated::Entry& entry = AudioSamplesGenerated::ENTRIES[i];
+  for (unsigned int i = 0; i < SamplesGenerated::ENTRY_COUNT; ++i) {
+    const SamplesGenerated::Entry& entry = SamplesGenerated::ENTRIES[i];
     if (entry.code != nullptr && strcmp(entry.code, code) == 0) {
       return entry.sample;
     }
