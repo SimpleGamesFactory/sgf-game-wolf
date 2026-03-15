@@ -15,9 +15,9 @@ uint16_t shadeColor(uint16_t color565, float distance) {
   uint8_t r5 = (color565 >> 11) & 0x1F;
   uint8_t g6 = (color565 >> 5) & 0x3F;
   uint8_t b5 = color565 & 0x1F;
-  uint8_t r = static_cast<uint8_t>((static_cast<float>(r5) * 255.0f / 31.0f) * brightness);
-  uint8_t g = static_cast<uint8_t>((static_cast<float>(g6) * 255.0f / 63.0f) * brightness);
-  uint8_t b = static_cast<uint8_t>((static_cast<float>(b5) * 255.0f / 31.0f) * brightness);
+  uint8_t r = (r5 * 255.0f / 31.0f) * brightness;
+  uint8_t g = (g6 * 255.0f / 63.0f) * brightness;
+  uint8_t b = (b5 * 255.0f / 31.0f) * brightness;
   return Color565::rgb(r, g, b);
 }
 
@@ -81,8 +81,8 @@ void render(const RenderView& view, const WolfRender::ISprite* const* sprites, i
     }
 
     int spriteScreenX =
-      static_cast<int>((static_cast<float>(view.width) * 0.5f) * (1.0f + transformX / transformY));
-    int spriteHeight = abs(static_cast<int>(static_cast<float>(view.height) / transformY));
+      (view.width * 0.5f) * (1.0f + transformX / transformY);
+    int spriteHeight = abs(view.height / transformY);
     int spriteWidth =
       (spriteHeight * Math::clamp(sprite.widthScaleNum(), 1, 16)) /
       Math::clamp(sprite.widthScaleDen(), 1, 16);

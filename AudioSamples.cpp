@@ -27,7 +27,7 @@ constexpr int8_t kSnarePcm[] = {
 
 const SGFAudio::AudioSample kSnare{
   .pcm = kSnarePcm,
-  .length = static_cast<uint32_t>(sizeof(kSnarePcm) / sizeof(kSnarePcm[0])),
+  .length = sizeof(kSnarePcm) / sizeof(kSnarePcm[0]),
   .sampleRate = 11025u,
   .rootHz = 1.0f,
   .loop = false,

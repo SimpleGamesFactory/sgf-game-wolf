@@ -6,7 +6,7 @@
 
 class WolfProfiler {
 public:
-  enum class Slot : uint8_t {
+  enum Slot : uint8_t {
     Fps,
     Physics,
     Input,
@@ -33,7 +33,7 @@ public:
   const Profiler& profiler() const { return stageProfiler; }
 
 private:
-  Profiler::Slot profilerSlots[static_cast<int>(Slot::Count)]{};
+  Profiler::Slot profilerSlots[Count]{};
   Profiler stageProfiler;
   bool initialized = false;
 

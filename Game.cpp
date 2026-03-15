@@ -63,11 +63,11 @@ uint16_t applyDamageFlash(uint16_t color565, uint8_t strength) {
   uint8_t g6 = (color565 >> 5) & 0x3F;
   uint8_t b5 = color565 & 0x1F;
 
-  r5 = static_cast<uint8_t>(r5 + (((31u - r5) * strength) >> 8));
-  g6 = static_cast<uint8_t>((g6 * (255u - (strength >> 1))) >> 8);
-  b5 = static_cast<uint8_t>((b5 * (255u - ((strength * 3u) >> 2))) >> 8);
+  r5 = r5 + (((31u - r5) * strength) >> 8);
+  g6 = (g6 * (255u - (strength >> 1))) >> 8;
+  b5 = (b5 * (255u - ((strength * 3u) >> 2))) >> 8;
 
-  return static_cast<uint16_t>((r5 << 11) | (g6 << 5) | b5);
+  return (r5 << 11) | (g6 << 5) | b5;
 }
 
 uint16_t applyShotFlash(uint16_t color565, uint8_t strength) {
@@ -79,11 +79,11 @@ uint16_t applyShotFlash(uint16_t color565, uint8_t strength) {
   uint8_t g6 = (color565 >> 5) & 0x3F;
   uint8_t b5 = color565 & 0x1F;
 
-  r5 = static_cast<uint8_t>(r5 + (((31u - r5) * strength) >> 8));
-  g6 = static_cast<uint8_t>(g6 + (((63u - g6) * strength) >> 9));
-  b5 = static_cast<uint8_t>(b5 + (((31u - b5) * strength) >> 10));
+  r5 = r5 + (((31u - r5) * strength) >> 8);
+  g6 = g6 + (((63u - g6) * strength) >> 9);
+  b5 = b5 + (((31u - b5) * strength) >> 10);
 
-  return static_cast<uint16_t>((r5 << 11) | (g6 << 5) | b5);
+  return (r5 << 11) | (g6 << 5) | b5;
 }
 
 uint8_t damageFlashStrength(uint32_t nowMs, uint32_t damageFlashUntilMs, uint32_t durationMs) {
@@ -96,7 +96,7 @@ uint8_t damageFlashStrength(uint32_t nowMs, uint32_t damageFlashUntilMs, uint32_
   if (strength > 224u) {
     strength = 224u;
   }
-  return static_cast<uint8_t>(strength);
+  return strength;
 }
 
 uint8_t shotFlashStrength(uint32_t nowMs, uint32_t shotUntilMs, uint32_t durationMs) {
@@ -114,8 +114,37 @@ uint8_t shotFlashStrength(uint32_t nowMs, uint32_t shotUntilMs, uint32_t duratio
   if (strength > 112u) {
     strength = 112u;
   }
-  return static_cast<uint8_t>(strength);
+  return strength;
 }
+
+template <typename T>
+T* allocBuffer(size_t count) {
+#if defined(ARDUINO_ARCH_ESP32)
+  return static_cast<T*>(heap_caps_malloc(sizeof(T) * count, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+#else
+  return static_cast<T*>(malloc(sizeof(T) * count));
+#endif
+}
+
+template <typename T, size_t width>
+T (*allocRows(size_t rowCount))[width] {
+#if defined(ARDUINO_ARCH_ESP32)
+  return static_cast<T (*)[width]>(
+    heap_caps_malloc(sizeof(T) * width * rowCount, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+#else
+  return static_cast<T (*)[width]>(malloc(sizeof(T) * width * rowCount));
+#endif
+}
+
+#if WOLF_DYNAMIC_FRAMEBUFFER && defined(ARDUINO_ARCH_ESP32)
+template <typename T>
+T* allocAlignedBuffer(size_t count, size_t alignment) {
+  return static_cast<T*>(heap_caps_aligned_alloc(
+    alignment,
+    sizeof(T) * count,
+    MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT | MALLOC_CAP_CACHE_ALIGNED));
+}
+#endif
 
 }  // namespace
 
@@ -152,13 +181,7 @@ void Wolf3DGame::onSetup() {
   }
 #if WOLF_HEAP_COLD_BUFFERS
   if (map == nullptr) {
-    const size_t mapBytes = sizeof(uint8_t) * MAP_MAX_W * MAP_MAX_H;
-#if defined(ARDUINO_ARCH_ESP32)
-    map = static_cast<uint8_t (*)[MAP_MAX_W]>(
-      heap_caps_malloc(mapBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
-#else
-    map = static_cast<uint8_t (*)[MAP_MAX_W]>(malloc(mapBytes));
-#endif
+    map = allocRows<uint8_t, MAP_MAX_W>(MAP_MAX_H);
     if (map == nullptr) {
       while (true) {
         delay(1000);
@@ -166,13 +189,7 @@ void Wolf3DGame::onSetup() {
     }
   }
   if (doorOpenAmounts == nullptr) {
-    const size_t doorBytes = sizeof(uint8_t) * MAP_MAX_W * MAP_MAX_H;
-#if defined(ARDUINO_ARCH_ESP32)
-    doorOpenAmounts = static_cast<uint8_t*>(
-      heap_caps_malloc(doorBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
-#else
-    doorOpenAmounts = static_cast<uint8_t*>(malloc(doorBytes));
-#endif
+    doorOpenAmounts = allocBuffer<uint8_t>(MAP_MAX_W * MAP_MAX_H);
     if (doorOpenAmounts == nullptr) {
       while (true) {
         delay(1000);
@@ -181,14 +198,10 @@ void Wolf3DGame::onSetup() {
   }
 #endif
 #if WOLF_DYNAMIC_FRAMEBUFFER
-  const size_t frameBytes = sizeof(uint16_t) * RENDER_W * RENDER_H;
 #if defined(ARDUINO_ARCH_ESP32)
-  frameBuffer = static_cast<uint16_t*>(heap_caps_aligned_alloc(
-    DYNAMIC_FRAMEBUFFER_ALIGNMENT,
-    frameBytes,
-    MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT | MALLOC_CAP_CACHE_ALIGNED));
+  frameBuffer = allocAlignedBuffer<uint16_t>(RENDER_W * RENDER_H, DYNAMIC_FRAMEBUFFER_ALIGNMENT);
 #else
-  frameBuffer = static_cast<uint16_t*>(malloc(frameBytes));
+  frameBuffer = allocBuffer<uint16_t>(RENDER_W * RENDER_H);
 #endif
   if (frameBuffer == nullptr) {
     while (true) {
@@ -268,7 +281,7 @@ void Wolf3DGame::onPhysics(float delta) {
   updateDoors(delta);
 
   sectionStartUs = micros();
-  updateZombies(delta);
+  updateEnemies(delta);
   profiler.add(WolfProfiler::Slot::ZombieUpdate, micros() - sectionStartUs);
 
   sectionStartUs = micros();
@@ -302,7 +315,7 @@ void Wolf3DGame::resetMap() {
   Map::load(map, doorOpenBits, mapWidth, mapHeight, spawn);
   memset(doorOpenAmounts, 0, sizeof(uint8_t) * MAP_MAX_W * MAP_MAX_H);
   memset(doorUnlockedBits, 0, sizeof(doorUnlockedBits));
-  Zombie::loadSpawns(zombies, zombieCount, MapLayout::E1M1);
+  Enemy::loadSpawns(enemies, enemyCount, MapLayout::E1M1);
 }
 
 void Wolf3DGame::resetPlayerPose() {
@@ -325,13 +338,13 @@ void Wolf3DGame::resetPlayerPose() {
   }
 }
 
-Zombie::WorldView Wolf3DGame::makeZombieWorldView(uint32_t nowMs, float delta) const {
-  Zombie::WorldView world;
-  world.map = &map[0][0];
-  world.doorOpenAmounts = doorOpenAmounts;
-  world.mapStride = MAP_MAX_W;
-  world.mapWidth = mapWidth;
-  world.mapHeight = mapHeight;
+Enemy::WorldView Wolf3DGame::makeEnemyWorldView(uint32_t nowMs, float delta) const {
+  Enemy::WorldView world;
+  world.grid.map = &map[0][0];
+  world.grid.doorOpenAmounts = doorOpenAmounts;
+  world.grid.mapStride = MAP_MAX_W;
+  world.grid.mapWidth = mapWidth;
+  world.grid.mapHeight = mapHeight;
   world.playerX = playerX;
   world.playerY = playerY;
   world.nowMs = nowMs;
@@ -374,11 +387,11 @@ void Wolf3DGame::setDoorOpen(int cellX, int cellY, bool open) {
     return;
   }
   int index = cellY * MAP_MAX_W + cellX;
-  uint8_t mask = static_cast<uint8_t>(1u << (index & 7));
+  uint8_t mask = 1u << (index & 7);
   if (open) {
     doorOpenBits[index >> 3] |= mask;
   } else {
-    doorOpenBits[index >> 3] &= static_cast<uint8_t>(~mask);
+    doorOpenBits[index >> 3] &= ~mask;
   }
 }
 
@@ -387,11 +400,11 @@ void Wolf3DGame::setDoorUnlocked(int cellX, int cellY, bool unlocked) {
     return;
   }
   int index = cellY * MAP_MAX_W + cellX;
-  uint8_t mask = static_cast<uint8_t>(1u << (index & 7));
+  uint8_t mask = 1u << (index & 7);
   if (unlocked) {
     doorUnlockedBits[index >> 3] |= mask;
   } else {
-    doorUnlockedBits[index >> 3] &= static_cast<uint8_t>(~mask);
+    doorUnlockedBits[index >> 3] &= ~mask;
   }
 }
 
@@ -416,7 +429,7 @@ void Wolf3DGame::updateDoors(float delta) {
   if (doorOpenAmounts == nullptr) {
     return;
   }
-  int step = static_cast<int>(Door::OPEN_SPEED_PER_SEC * 255.0f * delta);
+  int step = Door::OPEN_SPEED_PER_SEC * 255.0f * delta;
   if (step < 1) {
     step = 1;
   }
@@ -439,7 +452,7 @@ void Wolf3DGame::updateDoors(float delta) {
           current = target;
         }
       }
-      doorOpenAmounts[index] = static_cast<uint8_t>(current);
+      doorOpenAmounts[index] = current;
     }
   }
 }
@@ -447,10 +460,10 @@ void Wolf3DGame::updateDoors(float delta) {
 bool Wolf3DGame::blockedAt(float testX, float testY) const {
   const float r = PLAYER_RADIUS;
   return
-    wallAt(static_cast<int>(testX - r), static_cast<int>(testY - r)) ||
-    wallAt(static_cast<int>(testX + r), static_cast<int>(testY - r)) ||
-    wallAt(static_cast<int>(testX - r), static_cast<int>(testY + r)) ||
-    wallAt(static_cast<int>(testX + r), static_cast<int>(testY + r));
+    wallAt(testX - r, testY - r) ||
+    wallAt(testX + r, testY - r) ||
+    wallAt(testX - r, testY + r) ||
+    wallAt(testX + r, testY + r);
 }
 
 bool Wolf3DGame::attemptMove(float nextX, float nextY) {
@@ -494,7 +507,7 @@ void Wolf3DGame::updateHeadBob(float delta, bool moved) {
 }
 
 int Wolf3DGame::bobOffsetY() const {
-  return static_cast<int>(roundf(headBobOffset));
+  return roundf(headBobOffset);
 }
 
 void Wolf3DGame::rotate(float angle) {
@@ -510,8 +523,8 @@ void Wolf3DGame::rotate(float angle) {
 }
 
 bool Wolf3DGame::toggleDoorAhead() {
-  int cellX = static_cast<int>(playerX + dirX * DOOR_REACH);
-  int cellY = static_cast<int>(playerY + dirY * DOOR_REACH);
+  int cellX = playerX + dirX * DOOR_REACH;
+  int cellY = playerY + dirY * DOOR_REACH;
   if (cellX < 0 || cellX >= mapWidth || cellY < 0 || cellY >= mapHeight) {
     return false;
   }
@@ -530,7 +543,7 @@ bool Wolf3DGame::toggleDoorAhead() {
       return true;
     }
     if (required != KeyColor::None && !isDoorUnlocked(cellX, cellY)) {
-      keysOwned &= static_cast<uint8_t>(~Keys::bitFor(required));
+      keysOwned &= ~Keys::bitFor(required);
       hud.setKeys(keysOwned);
       setDoorUnlocked(cellX, cellY, true);
     }
@@ -541,14 +554,14 @@ bool Wolf3DGame::toggleDoorAhead() {
 }
 
 bool Wolf3DGame::canCloseDoor(int cellX, int cellY) const {
-  int playerCellX = static_cast<int>(playerX);
-  int playerCellY = static_cast<int>(playerY);
+  int playerCellX = playerX;
+  int playerCellY = playerY;
   return playerCellX != cellX || playerCellY != cellY;
 }
 
 void Wolf3DGame::collectPickupUnderPlayer() {
-  int cellX = static_cast<int>(playerX);
-  int cellY = static_cast<int>(playerY);
+  int cellX = playerX;
+  int cellY = playerY;
   if (cellX < 0 || cellX >= mapWidth || cellY < 0 || cellY >= mapHeight) {
     return;
   }
@@ -590,7 +603,7 @@ void Wolf3DGame::collectPickupUnderPlayer() {
 int Wolf3DGame::shotDamage(float hitDistance) const {
   float distance = Math::clamp(hitDistance, 0.0f, 8.0f);
   float baseDamage = 10.0f - distance * 0.9f;
-  int damage = static_cast<int>(roundf(baseDamage)) + random(-2, 3);
+  int damage = roundf(baseDamage) + random(-2, 3);
   return Math::clamp(damage, 1, 12);
 }
 
@@ -606,26 +619,22 @@ void Wolf3DGame::shoot() {
   hud.setFaceMood(currentFaceMood(nowMs));
   audio.playFire();
 
-  Zombie::WorldView world = makeZombieWorldView(nowMs, 0.0f);
-  Zombie::AimView aim{world, dirX, dirY};
+  Enemy::WorldView world = makeEnemyWorldView(nowMs, 0.0f);
+  Enemy::AimView aim{world, dirX, dirY};
   int targetIndex = -1;
   float bestDistance = 1e30f;
-  for (int i = 0; i < zombieCount; i++) {
+  for (int i = 0; i < enemyCount; i++) {
     float hitDistance = 0.0f;
-    if (zombies[i].tryHit(aim, hitDistance) && hitDistance < bestDistance) {
+    if (enemies[i].tryHit(aim, hitDistance) && hitDistance < bestDistance) {
       bestDistance = hitDistance;
       targetIndex = i;
     }
   }
   if (targetIndex >= 0) {
-    bool wasAlive = zombies[targetIndex].isAlive();
-    zombies[targetIndex].applyDamage(shotDamage(bestDistance));
-    if (wasAlive && !zombies[targetIndex].isAlive()) {
-      if (zombies[targetIndex].isGhost()) {
-        audio.playGhostDie();
-      } else {
-        audio.playZombieDie();
-      }
+    bool wasAlive = enemies[targetIndex].isAlive();
+    enemies[targetIndex].applyDamage(shotDamage(bestDistance));
+    if (wasAlive && !enemies[targetIndex].isAlive()) {
+      audio.playEnemyAudio(enemies[targetIndex].dieSampleId);
     }
   }
 }
@@ -735,19 +744,15 @@ void Wolf3DGame::updateInput(float delta) {
   collectPickupUnderPlayer();
 }
 
-void Wolf3DGame::updateZombies(float delta) {
-  Zombie::WorldView world = makeZombieWorldView(millis(), delta);
+void Wolf3DGame::updateEnemies(float delta) {
+  Enemy::WorldView world = makeEnemyWorldView(millis(), delta);
   int damage = 0;
-  int zombieShots = 0;
-  int ghostAttacks = 0;
-  for (int i = 0; i < zombieCount; i++) {
-    zombies[i].update(world, damage, zombieShots, ghostAttacks);
-  }
-  if (zombieShots > 0) {
-    audio.playZombieFire();
-  }
-  if (ghostAttacks > 0) {
-    audio.playGhostAttack();
+  for (int i = 0; i < enemyCount; i++) {
+    const char* attackSampleId = nullptr;
+    enemies[i].update(world, damage, attackSampleId);
+    if (attackSampleId != nullptr) {
+      audio.playEnemyAudio(attackSampleId);
+    }
   }
   if (damage > 0) {
     applyDamage(damage);
@@ -790,7 +795,7 @@ void Wolf3DGame::updateFpsCounter(uint32_t nowMs) {
     return;
   }
 
-  displayedFps = static_cast<uint16_t>((fpsSampleFrames * 1000u + (elapsedMs / 2u)) / elapsedMs);
+  displayedFps = (fpsSampleFrames * 1000u + (elapsedMs / 2u)) / elapsedMs;
   fpsSampleFrames = 0;
   fpsSampleStartMs = nowMs;
 }
@@ -857,7 +862,7 @@ void Wolf3DGame::presentFrame() {
   if (UPSCALE == 1 && hitFlashStrength == 0 && muzzleFlashStrength == 0) {
     if (streamViewport) {
       renderTarget.beginBlit565Stream(VIEWPORT_X, VIEWPORT_Y, VIEWPORT_W, VIEWPORT_H);
-      renderTarget.writeBlit565StreamChunk(fb, static_cast<size_t>(VIEWPORT_W * VIEWPORT_H));
+      renderTarget.writeBlit565StreamChunk(fb, VIEWPORT_W * VIEWPORT_H);
       renderTarget.endBlit565Stream();
     } else {
       renderTarget.blit565(VIEWPORT_X, VIEWPORT_Y, VIEWPORT_W, VIEWPORT_H, fb);
@@ -920,14 +925,14 @@ void Wolf3DGame::presentFrame() {
       if (queuedPreSwappedStreamViewport) {
         renderTarget.queuePreSwappedBlit565StreamChunk(
           activeUpscaleBuffer,
-          static_cast<size_t>(VIEWPORT_W * dstRows));
+          VIEWPORT_W * dstRows);
         queuedChunks++;
       } else if (preSwappedStreamViewport) {
         renderTarget.writePreSwappedBlit565StreamChunk(
           activeUpscaleBuffer,
-          static_cast<size_t>(VIEWPORT_W * dstRows));
+          VIEWPORT_W * dstRows);
       } else {
-        renderTarget.writeBlit565StreamChunk(activeUpscaleBuffer, static_cast<size_t>(VIEWPORT_W * dstRows));
+        renderTarget.writeBlit565StreamChunk(activeUpscaleBuffer, VIEWPORT_W * dstRows);
       }
     } else {
       renderTarget.blit565(VIEWPORT_X, VIEWPORT_Y + srcY0 * UPSCALE, VIEWPORT_W, dstRows, activeUpscaleBuffer);
@@ -945,25 +950,25 @@ void Wolf3DGame::clearFrame() {
     bool isSky = y < horizon;
     float bandT;
     if (isSky) {
-      bandT = static_cast<float>(y) / static_cast<float>(horizon);
+      bandT = y / float(horizon);
     } else {
-      bandT = static_cast<float>(y - horizon) /
-              static_cast<float>(RENDER_H - horizon);
+      bandT = (y - horizon) /
+              float(RENDER_H - horizon);
     }
 
     uint16_t color565;
     if (isSky) {
-      uint8_t r = static_cast<uint8_t>(18.0f + bandT * 26.0f);
-      uint8_t g = static_cast<uint8_t>(28.0f + bandT * 40.0f);
-      uint8_t b = static_cast<uint8_t>(60.0f + bandT * 52.0f);
+      uint8_t r = 18.0f + bandT * 26.0f;
+      uint8_t g = 28.0f + bandT * 40.0f;
+      uint8_t b = 60.0f + bandT * 52.0f;
       color565 = Color565::rgb(r, g, b);
     } else if (SIMPLE_FLOOR) {
-      uint8_t c = static_cast<uint8_t>(72.0f - bandT * 34.0f);
+      uint8_t c = 72.0f - bandT * 34.0f;
       color565 = Color565::rgb(c, c, c + 4);
     } else {
-      uint8_t r = static_cast<uint8_t>(28.0f - bandT * 12.0f);
-      uint8_t g = static_cast<uint8_t>(20.0f - bandT * 8.0f);
-      uint8_t b = static_cast<uint8_t>(18.0f - bandT * 6.0f);
+      uint8_t r = 28.0f - bandT * 12.0f;
+      uint8_t g = 20.0f - bandT * 8.0f;
+      uint8_t b = 18.0f - bandT * 6.0f;
       color565 = Color565::rgb(r, g, b);
     }
 
@@ -994,12 +999,12 @@ void Wolf3DGame::renderFloor() {
 void Wolf3DGame::renderWorld() {
   int centerY = (RENDER_H / 2) + bobOffsetY();
   for (int x = 0; x < RENDER_W; x++) {
-    float cameraX = 2.0f * static_cast<float>(x) / static_cast<float>(RENDER_W) - 1.0f;
+    float cameraX = 2.0f * x / float(RENDER_W) - 1.0f;
     float rayDirX = dirX + planeX * cameraX;
     float rayDirY = dirY + planeY * cameraX;
 
-    int mapX = static_cast<int>(playerX);
-    int mapY = static_cast<int>(playerY);
+    int mapX = playerX;
+    int mapY = playerY;
     float deltaDistX = (rayDirX == 0.0f) ? 1e30f : fabsf(1.0f / rayDirX);
     float deltaDistY = (rayDirY == 0.0f) ? 1e30f : fabsf(1.0f / rayDirY);
 
@@ -1010,17 +1015,17 @@ void Wolf3DGame::renderWorld() {
 
     if (rayDirX < 0.0f) {
       stepX = -1;
-      sideDistX = (playerX - static_cast<float>(mapX)) * deltaDistX;
+      sideDistX = (playerX - mapX) * deltaDistX;
     } else {
       stepX = 1;
-      sideDistX = (static_cast<float>(mapX + 1) - playerX) * deltaDistX;
+      sideDistX = (mapX + 1.0f - playerX) * deltaDistX;
     }
     if (rayDirY < 0.0f) {
       stepY = -1;
-      sideDistY = (playerY - static_cast<float>(mapY)) * deltaDistY;
+      sideDistY = (playerY - mapY) * deltaDistY;
     } else {
       stepY = 1;
-      sideDistY = (static_cast<float>(mapY + 1) - playerY) * deltaDistY;
+      sideDistY = (mapY + 1.0f - playerY) * deltaDistY;
     }
 
     bool hit = false;
@@ -1052,11 +1057,11 @@ void Wolf3DGame::renderWorld() {
         float testPerpWallDist;
         if (!side) {
           testPerpWallDist =
-            (static_cast<float>(mapX) - playerX + (1.0f - static_cast<float>(stepX)) * 0.5f) /
+            (mapX - playerX + (1.0f - stepX) * 0.5f) /
             rayDirX;
         } else {
           testPerpWallDist =
-            (static_cast<float>(mapY) - playerY + (1.0f - static_cast<float>(stepY)) * 0.5f) /
+            (mapY - playerY + (1.0f - stepY) * 0.5f) /
             rayDirY;
         }
         if (testPerpWallDist < 0.001f) {
@@ -1071,7 +1076,7 @@ void Wolf3DGame::renderWorld() {
         }
         testWallX -= floorf(testWallX);
 
-        int testTexX = static_cast<int>(testWallX * static_cast<float>(Walls::TEX_SIZE));
+        int testTexX = testWallX * Walls::TEX_SIZE;
         testTexX = Math::clamp(testTexX, 0, Walls::TEX_SIZE - 1);
         if ((!side && rayDirX < 0.0f) || (side && rayDirY > 0.0f)) {
           testTexX = Walls::TEX_SIZE - testTexX - 1;
@@ -1088,18 +1093,18 @@ void Wolf3DGame::renderWorld() {
     float perpWallDist;
     if (!side) {
       perpWallDist =
-        (static_cast<float>(mapX) - playerX + (1.0f - static_cast<float>(stepX)) * 0.5f) /
+        (mapX - playerX + (1.0f - stepX) * 0.5f) /
         rayDirX;
     } else {
       perpWallDist =
-        (static_cast<float>(mapY) - playerY + (1.0f - static_cast<float>(stepY)) * 0.5f) /
+        (mapY - playerY + (1.0f - stepY) * 0.5f) /
         rayDirY;
     }
     if (perpWallDist < 0.001f) {
       perpWallDist = 0.001f;
     }
 
-    int lineHeight = static_cast<int>(static_cast<float>(RENDER_H) / perpWallDist);
+    int lineHeight = RENDER_H / perpWallDist;
     int rawDrawStart = (-lineHeight / 2) + centerY;
     int drawStart = rawDrawStart;
     int drawEnd = (lineHeight / 2) + centerY;
@@ -1118,7 +1123,7 @@ void Wolf3DGame::renderWorld() {
     }
     wallX -= floorf(wallX);
 
-    int texX = static_cast<int>(wallX * static_cast<float>(Walls::TEX_SIZE));
+    int texX = wallX * Walls::TEX_SIZE;
     texX = Math::clamp(texX, 0, Walls::TEX_SIZE - 1);
     if ((!side && rayDirX < 0.0f) || (side && rayDirY > 0.0f)) {
       texX = Walls::TEX_SIZE - texX - 1;
@@ -1142,7 +1147,7 @@ void Wolf3DGame::renderWorld() {
 
 void Wolf3DGame::renderFpsCounter() {
   char fpsText[12];
-  snprintf(fpsText, sizeof(fpsText), "%u FPS", static_cast<unsigned>(displayedFps));
+  snprintf(fpsText, sizeof(fpsText), "%u FPS", displayedFps);
 
   FrameBufferFillRect fillRect(frameBuffer, RENDER_W, RENDER_H);
   const int textScale = 1;
@@ -1179,18 +1184,18 @@ void Wolf3DGame::renderSprites(uint32_t nowMs) {
       Pickups::initSprite(
         spriteStorage[spriteCount],
         tile,
-        static_cast<float>(mapX) + 0.5f,
-        static_cast<float>(mapY) + 0.5f);
+        mapX + 0.5f,
+        mapY + 0.5f);
       spriteRefs[spriteCount] = &spriteStorage[spriteCount];
       spriteCount++;
     }
   }
 
-  for (int i = 0; i < zombieCount && spriteCount < SpriteRenderer::MAX_SPRITES; i++) {
-    if (!zombies[i].isAlive() && !zombies[i].hasCorpse()) {
+  for (int i = 0; i < enemyCount && spriteCount < SpriteRenderer::MAX_SPRITES; i++) {
+    if (!enemies[i].isAlive() && !enemies[i].hasCorpse()) {
       continue;
     }
-    spriteRefs[spriteCount] = &zombies[i].sprite();
+    spriteRefs[spriteCount] = &enemies[i].sprite();
     spriteCount++;
   }
 
@@ -1310,8 +1315,8 @@ uint16_t Wolf3DGame::shadeColor(uint16_t color565, float distance, bool side) co
   uint8_t r5 = (color565 >> 11) & 0x1F;
   uint8_t g6 = (color565 >> 5) & 0x3F;
   uint8_t b5 = color565 & 0x1F;
-  uint8_t r = static_cast<uint8_t>((static_cast<float>(r5) * 255.0f / 31.0f) * brightness);
-  uint8_t g = static_cast<uint8_t>((static_cast<float>(g6) * 255.0f / 63.0f) * brightness);
-  uint8_t b = static_cast<uint8_t>((static_cast<float>(b5) * 255.0f / 31.0f) * brightness);
+  uint8_t r = (r5 * 255.0f / 31.0f) * brightness;
+  uint8_t g = (g6 * 255.0f / 63.0f) * brightness;
+  uint8_t b = (b5 * 255.0f / 31.0f) * brightness;
   return Color565::rgb(r, g, b);
 }

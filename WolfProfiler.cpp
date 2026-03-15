@@ -2,21 +2,37 @@
 
 namespace {
 
-constexpr int SLOT_COUNT = static_cast<int>(WolfProfiler::Slot::Count);
+constexpr int SLOT_COUNT = WolfProfiler::Count;
+constexpr const char* SLOT_LABELS[SLOT_COUNT] = {
+  "fps",
+  "physics",
+  "input",
+  "zupd",
+  "hudanim",
+  "floor",
+  "world",
+  "sprites",
+  "weapon",
+  "minimap",
+  "fpsov",
+  "present",
+  "hudr",
+  "hudf",
+};
 
 }  // namespace
 
 WolfProfiler::WolfProfiler()
-  : stageProfiler("wolf", profilerSlots, static_cast<uint8_t>(Slot::Count)) {}
+  : stageProfiler("wolf", profilerSlots, Count) {}
 
 void WolfProfiler::begin() {
   if (initialized) {
     return;
   }
   for (int i = 0; i < SLOT_COUNT; i++) {
-    stageProfiler.setLabel(i, slotLabel(static_cast<Slot>(i)));
+    stageProfiler.setLabel(i, SLOT_LABELS[i]);
   }
-  stageProfiler.setMode(static_cast<int>(Slot::Fps), Profiler::CounterSlot);
+  stageProfiler.setMode(Fps, Profiler::CounterSlot);
   for (int i = 1; i < SLOT_COUNT; i++) {
     stageProfiler.setMode(i, Profiler::SampleSlot);
   }
@@ -24,11 +40,11 @@ void WolfProfiler::begin() {
 }
 
 void WolfProfiler::add(Slot slot, uint32_t elapsedUs) {
-  stageProfiler.probe(static_cast<int>(slot), elapsedUs);
+  stageProfiler.probe(slot, elapsedUs);
 }
 
 void WolfProfiler::frame() {
-  stageProfiler.increment(static_cast<int>(Slot::Fps));
+  stageProfiler.increment(Fps);
 }
 
 const char* WolfProfiler::slotLabel(Slot slot) {

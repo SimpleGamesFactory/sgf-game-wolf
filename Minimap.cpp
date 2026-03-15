@@ -155,12 +155,12 @@ void Minimap::render(
     }
   }
 
-  int px = mapX0 + static_cast<int>(playerX * static_cast<float>(cell));
-  int py = mapY0 + static_cast<int>(playerY * static_cast<float>(cell));
+  int px = mapX0 + playerX * cell;
+  int py = mapY0 + playerY * cell;
   drawRect(buffer, width, height, px - 1, py - 1, 3, 3, Color565::rgb(255, 255, 255));
 
-  int lookX = px + static_cast<int>(dirX * static_cast<float>(cell * 2));
-  int lookY = py + static_cast<int>(dirY * static_cast<float>(cell * 2));
+  int lookX = px + dirX * (cell * 2);
+  int lookY = py + dirY * (cell * 2);
   int dx = abs(lookX - px);
   int sx = (px < lookX) ? 1 : -1;
   int dy = -abs(lookY - py);

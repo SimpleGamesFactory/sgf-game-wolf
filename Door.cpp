@@ -45,7 +45,7 @@ const char* Door::textureName(uint8_t tile) {
 }
 
 int Door::shiftedTexX(int texX, uint8_t openAmount) {
-  int shift = (static_cast<int>(openAmount) * (TEX_SIZE + 1)) / 256;
+  int shift = (openAmount * (TEX_SIZE + 1)) / 256;
   return texX - shift;
 }
 

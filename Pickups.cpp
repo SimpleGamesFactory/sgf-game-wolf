@@ -11,6 +11,11 @@ namespace Pickups {
 namespace {
 
 constexpr int EXTRA_PICKUP_COUNT = 2;
+constexpr uint8_t PICKUP_OWNER_RED = 'r';
+constexpr uint8_t PICKUP_OWNER_GREEN = 'g';
+constexpr uint8_t PICKUP_OWNER_BLUE = 'b';
+constexpr uint8_t PICKUP_OWNER_AMMO = 'a';
+constexpr uint8_t PICKUP_OWNER_MEDKIT = 'h';
 
 const char* textureName(uint8_t tile) {
   switch (tile) {
@@ -19,6 +24,17 @@ const char* textureName(uint8_t tile) {
     case 'b': return "sprite_key_blue";
     case 'a': return "sprite_ammo";
     case 'h': return "sprite_medkit";
+    default: return nullptr;
+  }
+}
+
+const uint8_t* ownerForTile(uint8_t tile) {
+  switch (tile) {
+    case 'r': return &PICKUP_OWNER_RED;
+    case 'g': return &PICKUP_OWNER_GREEN;
+    case 'b': return &PICKUP_OWNER_BLUE;
+    case 'a': return &PICKUP_OWNER_AMMO;
+    case 'h': return &PICKUP_OWNER_MEDKIT;
     default: return nullptr;
   }
 }
@@ -96,7 +112,7 @@ const uint16_t* fallbackTexture(uint8_t tile) {
   static uint16_t* textures[EXTRA_PICKUP_COUNT]{};
   if (!initialized) {
     for (int i = 0; i < EXTRA_PICKUP_COUNT; i++) {
-      textures[i] = static_cast<uint16_t*>(malloc(TEX_SIZE * TEX_SIZE * sizeof(uint16_t)));
+      textures[i] = new uint16_t[TEX_SIZE * TEX_SIZE];
       if (textures[i] == nullptr) {
         continue;
       }
@@ -119,7 +135,13 @@ const uint16_t* fallbackTexture(uint8_t tile) {
 
 void buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_t nowMs) {
   (void)nowMs;
-  const uint8_t tile = static_cast<uint8_t>(reinterpret_cast<uintptr_t>(owner));
+  const uint8_t* tileRef = owner == &PICKUP_OWNER_RED ? &PICKUP_OWNER_RED
+                         : owner == &PICKUP_OWNER_GREEN ? &PICKUP_OWNER_GREEN
+                         : owner == &PICKUP_OWNER_BLUE ? &PICKUP_OWNER_BLUE
+                         : owner == &PICKUP_OWNER_AMMO ? &PICKUP_OWNER_AMMO
+                         : owner == &PICKUP_OWNER_MEDKIT ? &PICKUP_OWNER_MEDKIT
+                         : nullptr;
+  uint8_t tile = tileRef == nullptr ? 0 : *tileRef;
   const uint16_t* tex = texture(tile);
   if (tex == nullptr) {
     memset(outTexture, 0, TEX_SIZE * TEX_SIZE * sizeof(uint16_t));
@@ -185,6 +207,7 @@ const uint16_t* texture(uint8_t tile) {
 }
 
 void initSprite(WolfRender::Sprite& sprite, uint8_t tile, float x, float y) {
+  const uint8_t* owner = ownerForTile(tile);
   sprite.configure(
     x,
     y,
@@ -193,7 +216,7 @@ void initSprite(WolfRender::Sprite& sprite, uint8_t tile, float x, float y) {
     1,
     3,
     8.0f,
-    reinterpret_cast<const void*>(static_cast<uintptr_t>(tile)),
+    owner,
     buildSpriteTexture);
 }
 

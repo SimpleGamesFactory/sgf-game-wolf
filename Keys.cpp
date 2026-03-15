@@ -10,12 +10,24 @@ namespace Keys {
 namespace {
 
 constexpr int KEY_COLOR_COUNT = 3;
+constexpr uint8_t KEY_OWNER_RED = 'r';
+constexpr uint8_t KEY_OWNER_GREEN = 'g';
+constexpr uint8_t KEY_OWNER_BLUE = 'b';
 
 const char* textureName(uint8_t tile) {
   switch (tile) {
     case 'r': return "sprite_key_red";
     case 'g': return "sprite_key_green";
     case 'b': return "sprite_key_blue";
+    default: return nullptr;
+  }
+}
+
+const uint8_t* ownerForTile(uint8_t tile) {
+  switch (tile) {
+    case 'r': return &KEY_OWNER_RED;
+    case 'g': return &KEY_OWNER_GREEN;
+    case 'b': return &KEY_OWNER_BLUE;
     default: return nullptr;
   }
 }
@@ -81,7 +93,7 @@ const uint16_t* textureForColor(KeyColor color) {
       } else if (colorIdx == 2) {
         buildColor = KeyColor::Blue;
       }
-      textures[colorIdx] = static_cast<uint16_t*>(malloc(TEX_SIZE * TEX_SIZE * sizeof(uint16_t)));
+      textures[colorIdx] = new uint16_t[TEX_SIZE * TEX_SIZE];
       if (textures[colorIdx] == nullptr) {
         continue;
       }
@@ -103,7 +115,11 @@ const uint16_t* textureForColor(KeyColor color) {
 
 void buildSpriteTexture(const void* owner, uint16_t* outTexture, uint32_t nowMs) {
   (void)nowMs;
-  const uint8_t tile = static_cast<uint8_t>(reinterpret_cast<uintptr_t>(owner));
+  const uint8_t* tileRef = owner == &KEY_OWNER_RED ? &KEY_OWNER_RED
+                         : owner == &KEY_OWNER_GREEN ? &KEY_OWNER_GREEN
+                         : owner == &KEY_OWNER_BLUE ? &KEY_OWNER_BLUE
+                         : nullptr;
+  uint8_t tile = tileRef == nullptr ? 0 : *tileRef;
   const uint16_t* tex = texture(tile);
   if (tex == nullptr) {
     memset(outTexture, 0, TEX_SIZE * TEX_SIZE * sizeof(uint16_t));
@@ -166,6 +182,7 @@ const uint16_t* texture(uint8_t tile) {
 }
 
 void initSprite(WolfRender::Sprite& sprite, uint8_t tile, float x, float y) {
+  const uint8_t* owner = ownerForTile(tile);
   sprite.configure(
     x,
     y,
@@ -174,7 +191,7 @@ void initSprite(WolfRender::Sprite& sprite, uint8_t tile, float x, float y) {
     1,
     3,
     8.0f,
-    reinterpret_cast<const void*>(static_cast<uintptr_t>(tile)),
+    owner,
     buildSpriteTexture);
 }
 

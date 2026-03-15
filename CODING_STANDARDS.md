@@ -1,9 +1,9 @@
 # CODING_STANDARDS.md
 
 Minimal C++/Arduino guidelines for this repo:
-- Naming: classes/structs `PascalCase`, functions/methods `lowerCamelCase`, variables/members `lowerCamelCase` (no trailing underscores); constants `SCREAMING_SNAKE_CASE` using `constexpr` when possible.
+- Naming: classes/structs `PascalCase`, functions/methods `lowerCamelCase`, variables/members `lowerCamelCase` (no trailing underscores); constants `SCREAMING_SNAKE_CASE`.
 - Braces on the same line as the header (`if (...) {`), always use braces even for single statements.
-- Prefer `const`/`constexpr` and references over pointers when `nullptr` is not expected.
+- Prefer `const` and references over pointers when `nullptr` is not expected.
 - Avoid dynamic allocation; use static/stack buffers sized for the MCU constraints.
 - Includes: project/local headers in `""`, platform/stdlib in `<...>`; include only what you need.
 - Formatting: 2-space indent, keep lines short (< 100 chars), use spaces after commas and around operators.
@@ -21,4 +21,13 @@ Minimal C++/Arduino guidelines for this repo:
 - If object state change has invariants/side effects (e.g. syncing a bound sprite), the state must be changed through the object API (`setPosition`, `setX`, etc.), not by external direct field mutation.
 - Do not add central "sync all objects" sweeps to compensate for leaked state mutation. Update dependent state at the point where the owning object state changes.
 - Stop generating fucking bloat code.
+- Do not cast without a real reason.
+- If a cast is truly necessary, prefer the shortest correct form (`std::move`, a compact `static_cast`, or a tiny typed helper) instead of verbose conversion scaffolding.
+- Do not replace one cast style mechanically with another.
+- Keep code compact; do not split simple one-line expressions into multiple temporaries unless it materially improves correctness or readability.
 - When a struct/class already has sane defaults, initialize only the non-default fields; do not restate `nullptr`, `0`, empty structs, or default enum/flag values without a real reason.
+- If a value is meant to be tuned from build `DEFINES`, do not hide it in `static constexpr` or file-local constants. Use `#ifndef/#define` so it is actually overridable from the build.
+- Do not introduce new local tuning constants in `.cpp` for things the project may want to tweak. Build-time configuration must stay build-time configurable.
+- Do not hardcode per-type gameplay differences through helper-method `if` chains like `if (kind == ...)`. Pass a data object/archetype/config into the instance and use that.
+- Do not bury pathfinding/navigation inside actor classes. Put navigation/path search in a separate module/class and have the actor consume it.
+- When future content may come from data files, keep entity code data-driven now; changing content definitions must not require changing gameplay class code.

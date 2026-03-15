@@ -7,7 +7,16 @@
 - Prefer small, precise patches over sweeping rewrites.
 - Keep the project’s style/structure; do not impose your own organization unasked.
 - Stop generating fucking bloat code.
+- Do not cast without a reason.
+- If a cast is truly necessary, use the shortest correct idiom (`std::move`, a compact `static_cast`, or a tiny typed helper) instead of bloated conversion scaffolding.
+- Do not replace one bad cast style with another mechanically.
+- Keep code compact; do not expand one-line logic into multiple temporaries unless it materially improves correctness or readability.
 - If a type already has sane defaults, set only the fields that differ; do not bloat config objects with redundant `0`/`nullptr`/empty/default assignments.
+- If a knob is expected to be changed from build `DEFINES`, it must not be implemented as `static constexpr` or a file-local tuning constant. Use `#ifndef/#define` so the build can actually override it.
+- Do not bury tunable thresholds/timings/cutoffs inside `.cpp` locals when they are likely to be adjusted during hardware tuning. Keep them overrideable from the build.
+- Do not hardcode per-type gameplay differences with `if (kind == ...)` helper logic. Use data-driven archetypes/config passed into the instance.
+- Keep navigation/pathfinding outside actor classes. Actors may call a navigation module, but path logic itself does not belong inside the actor implementation.
+- When a feature may later be loaded from data files, keep the runtime interface data-driven now so content additions do not require class code changes.
 - Follow [CODING_STANDARDS.md](/home/marcin/Arduino/Wolf/CODING_STANDARDS.md) for any C++/Arduino code changes.
 - Treat `CODING_STANDARDS.md` as mandatory, not advisory.
 - Keep Wolf-specific defaults and overrides in the Wolf project, not in shared `vendor/SGF` profiles or APIs.
@@ -68,7 +77,7 @@
   - [Textures.cpp](/home/marcin/Arduino/Wolf/Textures.cpp)
   - [WeaponRenderer.cpp](/home/marcin/Arduino/Wolf/WeaponRenderer.cpp)
   - [Pickups.cpp](/home/marcin/Arduino/Wolf/Pickups.cpp)
-  - [Zombie.cpp](/home/marcin/Arduino/Wolf/Zombie.cpp)
+  - [Enemy.cpp](/home/marcin/Arduino/Wolf/Enemy.cpp)
 - Build-time generator:
   - [tools/generate_textures.py](/home/marcin/Arduino/Wolf/tools/generate_textures.py)
 - Palette source of truth:

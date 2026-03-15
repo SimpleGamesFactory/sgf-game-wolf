@@ -68,7 +68,7 @@
 #include "Walls.h"
 #include "WolfAudio.h"
 #include "WolfProfiler.h"
-#include "Zombie.h"
+#include "Enemy.h"
 
 class Wolf3DGame : public Game {
 public:
@@ -228,8 +228,8 @@ private:
   int mapWidth = 0;
   int mapHeight = 0;
   Map::Spawn spawn;
-  Zombie zombies[Zombie::MAX_COUNT]{};
-  int zombieCount = 0;
+  Enemy enemies[Enemy::MAX_COUNT]{};
+  int enemyCount = 0;
 
   void onSetup() override;
   void onPhysics(float delta) override;
@@ -237,7 +237,7 @@ private:
 
   void resetMap();
   void resetPlayerPose();
-  Zombie::WorldView makeZombieWorldView(uint32_t nowMs, float delta) const;
+  Enemy::WorldView makeEnemyWorldView(uint32_t nowMs, float delta) const;
   bool hasKey(KeyColor color) const;
   uint8_t doorOpenAmountAt(int cellX, int cellY) const;
   bool isDoorOpen(int cellX, int cellY) const;
@@ -259,7 +259,7 @@ private:
   void shoot();
   void applyDamage(int amount);
   void updateInput(float delta);
-  void updateZombies(float delta);
+  void updateEnemies(float delta);
   void updateHudAnimation();
   void updateFpsCounter(uint32_t nowMs);
   Hud::FaceMood currentFaceMood(uint32_t nowMs) const;

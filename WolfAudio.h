@@ -27,6 +27,7 @@ public:
   void playHit();
   void playPickup();
   void playDoorOpen();
+  void playEnemyAudio(const char* audioId);
   void playZombieFire();
   void playZombieDie();
   void playGhostAttack();

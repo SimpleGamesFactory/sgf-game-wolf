@@ -33,9 +33,9 @@ map_char=g  code=key_green     asset=sprite_key_green notes=BMP-backed, fallback
 map_char=b  code=key_blue      asset=sprite_key_blue notes=BMP-backed, fallback in Keys.cpp
 map_char=a  code=ammo          asset=sprite_ammo     notes=BMP-backed, fallback in Pickups.cpp
 map_char=h  code=medkit        asset=sprite_medkit   notes=BMP-backed, fallback in Pickups.cpp
-map_char=@  code=zombie        asset=sprite_zombie   notes=BMP-backed, fallback in Zombie.cpp
-map_char=&  code=ghost         asset=sprite_ghost    notes=BMP-backed, auto-respawn ghost, fallback in Zombie.cpp
-map_char=%  code=zombie_dead   asset=sprite_zombie_dead notes=corpse sprite after death, BMP-backed, fallback in Zombie.cpp
+map_char=@  code=zombie        asset=sprite_zombie   notes=BMP-backed, fallback in Enemy.cpp
+map_char=&  code=ghost         asset=sprite_ghost    notes=BMP-backed, auto-respawn ghost, fallback in Enemy.cpp
+map_char=%  code=zombie_dead   asset=sprite_zombie_dead notes=corpse sprite after death, BMP-backed, fallback in Enemy.cpp
 
 Weapon
 ------

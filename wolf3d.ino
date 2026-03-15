@@ -35,9 +35,19 @@
 #define WOLF_AUDIO_DAC_TIMER_TEST 0
 #endif
 
+#ifndef WOLF_AUDIO_DIAG_QUIET
+#define WOLF_AUDIO_DIAG_QUIET 0
+#endif
+
 #include "SGF.h"
 #include "SGFHardwarePresets.h"
 #include "Game.h"
+
+#if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_DIAG_QUIET
+#include <esp_bt.h>
+#include <esp_log.h>
+#include <esp_wifi.h>
+#endif
 
 auto hardware = SGFHardwareProfile::makeRuntime();
 Wolf3DGame game(hardware.renderTarget(), hardware.screen(), hardware.profile);
@@ -82,7 +92,8 @@ private:
     if (arg == nullptr) {
       return;
     }
-    static_cast<DacTimerSilenceTestOutput*>(arg)->onTimer();
+    auto* output = static_cast<DacTimerSilenceTestOutput*>(arg);
+    output->onTimer();
   }
 
   void onTimer() { dacWrite(pin, 128u); }
@@ -101,22 +112,45 @@ public:
 };
 
 SilentAudioSource silentAudioSource;
-SGFAudio::ESP32DacSynthOutput audioOutput(silentAudioSource, WOLF_AUDIO_DAC_PIN);
+SGFAudio::ESP32DacAudioOutput audioOutput(silentAudioSource, WOLF_AUDIO_DAC_PIN);
 #else
-SGFAudio::ESP32DacSynthOutput audioOutput(game.audioBank(), WOLF_AUDIO_DAC_PIN);
+SGFAudio::ESP32DacAudioOutput audioOutput(game.audioBank(), WOLF_AUDIO_DAC_PIN);
 #endif
 #endif
 
+#if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_DIAG_QUIET
+namespace {
+
+void enterQuietDiagMode() {
+  esp_log_level_set("*", ESP_LOG_NONE);
+  Serial.setDebugOutput(false);
+  Serial.end();
+  esp_wifi_stop();
+  esp_wifi_deinit();
+  esp_bt_controller_disable();
+  esp_bt_controller_deinit();
+}
+
+}  // namespace
+#endif
+
 void setup() {
+#if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_DIAG_QUIET
+  enterQuietDiagMode();
+#endif
   hardware.display.begin(hardware.profile.display.spiHz);
   hardware.display.setRotation(hardware.profile.display.rotation);
   hardware.display.setBacklight(hardware.profile.display.backlightLevel);
 #if defined(ARDUINO_ARCH_ESP32) && WOLF_AUDIO_ENABLE
   audioOutput.begin();
+#if !WOLF_AUDIO_DIAG_QUIET
   audioOutput.attachSerialMonitor(serialMonitor);
 #endif
+#endif
+#if !WOLF_AUDIO_DIAG_QUIET
   game.attachSerialMonitor(serialMonitor);
   serialMonitor.attachProfiler(game.stageProfiler());
+#endif
   game.setup();
 }
 

@@ -27,7 +27,7 @@ Entry* entries = nullptr;
 uint16_t entryCount = 0;
 bool catalogReady = false;
 const char* lastLookupName = nullptr;
-Asset* lastLookupAsset = nullptr;
+Entry* lastLookupEntry = nullptr;
 
 bool usesTransparentIndex0(const char* name) {
   if (name == nullptr) {
@@ -40,8 +40,7 @@ uint16_t readU16(const uint8_t*& cursor, const uint8_t* end) {
   if (cursor + 2 > end) {
     return 0u;
   }
-  uint16_t value = static_cast<uint16_t>(cursor[0]) |
-                   static_cast<uint16_t>(cursor[1] << 8);
+  uint16_t value = cursor[0] | (cursor[1] << 8);
   cursor += 2;
   return value;
 }
@@ -154,16 +153,15 @@ Entry* findEntry(const char* name) {
     return nullptr;
   }
 
-  if (lastLookupName == name && lastLookupAsset != nullptr) {
-    return reinterpret_cast<Entry*>(
-      reinterpret_cast<uint8_t*>(lastLookupAsset) - offsetof(Entry, asset));
+  if (lastLookupName == name && lastLookupEntry != nullptr) {
+    return lastLookupEntry;
   }
 
   for (uint16_t i = 0; i < entryCount; i++) {
     const char* candidate = entries[i].asset.name;
     if (candidate != nullptr && strcmp(candidate, name) == 0) {
       lastLookupName = name;
-      lastLookupAsset = &entries[i].asset;
+      lastLookupEntry = &entries[i];
       return &entries[i];
     }
   }

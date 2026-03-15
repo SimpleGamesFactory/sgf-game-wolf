@@ -1,10 +1,23 @@
 #include "WolfAudio.h"
 
 #include "AudioSamples.h"
+#include <string.h>
 
 using namespace SGFAudio;
 
 namespace {
+
+template <typename T, size_t N>
+constexpr uint8_t count8(const T (&)[N]) {
+  static_assert(N <= 255u);
+  return N;
+}
+
+template <typename T, size_t N>
+constexpr uint16_t count16(const T (&)[N]) {
+  static_assert(N <= 65535u);
+  return N;
+}
 
 constexpr int kSfxVoiceCount = 2;
 constexpr int kLeadVoice = 2;
@@ -22,7 +35,7 @@ constexpr Instrument kFireInstrument{
   .waveform = Waveform::Square,
   .ampEnv = {1u, 18u, 0u, 25u},
   .pitchEnv = kFirePitchEnv,
-  .pitchEnvCount = static_cast<uint8_t>(sizeof(kFirePitchEnv) / sizeof(kFirePitchEnv[0])),
+  .pitchEnvCount = count8(kFirePitchEnv),
   .filterFlags = AUDIO_FILTER_LP,
   .lowPassCutoffHz = 1700.0f,
   .volume = 215u,
@@ -35,7 +48,7 @@ constexpr SfxStep kFireSteps[] = {
 constexpr Sfx kFireSfx{
   .instrument = &kFireInstrument,
   .steps = kFireSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kFireSteps) / sizeof(kFireSteps[0])),
+  .stepCount = count8(kFireSteps),
 };
 
 constexpr PitchPoint kHitPitchEnv[] = {
@@ -47,7 +60,7 @@ constexpr Instrument kHitInstrument{
   .waveform = Waveform::Triangle,
   .ampEnv = {0u, 40u, 0u, 45u},
   .pitchEnv = kHitPitchEnv,
-  .pitchEnvCount = static_cast<uint8_t>(sizeof(kHitPitchEnv) / sizeof(kHitPitchEnv[0])),
+  .pitchEnvCount = count8(kHitPitchEnv),
   .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1300.0f,
   .highPassCutoffHz = 120.0f,
@@ -61,7 +74,7 @@ constexpr SfxStep kHitSteps[] = {
 constexpr Sfx kHitSfx{
   .instrument = &kHitInstrument,
   .steps = kHitSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kHitSteps) / sizeof(kHitSteps[0])),
+  .stepCount = count8(kHitSteps),
 };
 
 constexpr Instrument kPickupInstrument{
@@ -81,7 +94,7 @@ constexpr SfxStep kPickupSteps[] = {
 constexpr Sfx kPickupSfx{
   .instrument = &kPickupInstrument,
   .steps = kPickupSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kPickupSteps) / sizeof(kPickupSteps[0])),
+  .stepCount = count8(kPickupSteps),
 };
 
 constexpr PitchPoint kDoorPitchEnv[] = {
@@ -93,7 +106,7 @@ constexpr Instrument kDoorInstrument{
   .waveform = Waveform::Triangle,
   .ampEnv = {3u, 120u, 110u, 70u},
   .pitchEnv = kDoorPitchEnv,
-  .pitchEnvCount = static_cast<uint8_t>(sizeof(kDoorPitchEnv) / sizeof(kDoorPitchEnv[0])),
+  .pitchEnvCount = count8(kDoorPitchEnv),
   .filterFlags = AUDIO_FILTER_LP,
   .lowPassCutoffHz = 1200.0f,
   .volume = 245u,
@@ -107,7 +120,7 @@ constexpr SfxStep kDoorSteps[] = {
 constexpr Sfx kDoorSfx{
   .instrument = &kDoorInstrument,
   .steps = kDoorSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kDoorSteps) / sizeof(kDoorSteps[0])),
+  .stepCount = count8(kDoorSteps),
 };
 
 constexpr PitchPoint kZombieFirePitchEnv[] = {
@@ -119,7 +132,7 @@ constexpr Instrument kZombieFireInstrument{
   .waveform = Waveform::Square,
   .ampEnv = {0u, 24u, 0u, 24u},
   .pitchEnv = kZombieFirePitchEnv,
-  .pitchEnvCount = static_cast<uint8_t>(sizeof(kZombieFirePitchEnv) / sizeof(kZombieFirePitchEnv[0])),
+  .pitchEnvCount = count8(kZombieFirePitchEnv),
   .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1500.0f,
   .highPassCutoffHz = 160.0f,
@@ -133,7 +146,7 @@ constexpr SfxStep kZombieFireSteps[] = {
 constexpr Sfx kZombieFireSfx{
   .instrument = &kZombieFireInstrument,
   .steps = kZombieFireSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kZombieFireSteps) / sizeof(kZombieFireSteps[0])),
+  .stepCount = count8(kZombieFireSteps),
 };
 
 constexpr PitchPoint kZombieDiePitchEnv[] = {
@@ -146,7 +159,7 @@ constexpr Instrument kZombieDieInstrument{
   .waveform = Waveform::Noise,
   .ampEnv = {0u, 70u, 0u, 90u},
   .pitchEnv = kZombieDiePitchEnv,
-  .pitchEnvCount = static_cast<uint8_t>(sizeof(kZombieDiePitchEnv) / sizeof(kZombieDiePitchEnv[0])),
+  .pitchEnvCount = count8(kZombieDiePitchEnv),
   .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1800.0f,
   .highPassCutoffHz = 110.0f,
@@ -160,7 +173,7 @@ constexpr SfxStep kZombieDieSteps[] = {
 constexpr Sfx kZombieDieSfx{
   .instrument = &kZombieDieInstrument,
   .steps = kZombieDieSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kZombieDieSteps) / sizeof(kZombieDieSteps[0])),
+  .stepCount = count8(kZombieDieSteps),
 };
 
 constexpr PitchPoint kGhostAttackPitchEnv[] = {
@@ -174,7 +187,7 @@ constexpr Instrument kGhostAttackInstrument{
   .ampEnv = {0u, 90u, 0u, 80u},
   .pitchLfo = {.enabled = true, .waveform = Waveform::Sine, .rateHz = 6.0f, .depthCents = 18.0f},
   .pitchEnv = kGhostAttackPitchEnv,
-  .pitchEnvCount = static_cast<uint8_t>(sizeof(kGhostAttackPitchEnv) / sizeof(kGhostAttackPitchEnv[0])),
+  .pitchEnvCount = count8(kGhostAttackPitchEnv),
   .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1400.0f,
   .highPassCutoffHz = 120.0f,
@@ -188,7 +201,7 @@ constexpr SfxStep kGhostAttackSteps[] = {
 constexpr Sfx kGhostAttackSfx{
   .instrument = &kGhostAttackInstrument,
   .steps = kGhostAttackSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kGhostAttackSteps) / sizeof(kGhostAttackSteps[0])),
+  .stepCount = count8(kGhostAttackSteps),
 };
 
 constexpr PitchPoint kGhostDiePitchEnv[] = {
@@ -202,7 +215,7 @@ constexpr Instrument kGhostDieInstrument{
   .ampEnv = {0u, 120u, 0u, 120u},
   .pitchLfo = {.enabled = true, .waveform = Waveform::Sine, .rateHz = 5.0f, .depthCents = 24.0f},
   .pitchEnv = kGhostDiePitchEnv,
-  .pitchEnvCount = static_cast<uint8_t>(sizeof(kGhostDiePitchEnv) / sizeof(kGhostDiePitchEnv[0])),
+  .pitchEnvCount = count8(kGhostDiePitchEnv),
   .filterFlags = AUDIO_FILTER_LP | AUDIO_FILTER_HP,
   .lowPassCutoffHz = 1200.0f,
   .highPassCutoffHz = 100.0f,
@@ -216,7 +229,7 @@ constexpr SfxStep kGhostDieSteps[] = {
 constexpr Sfx kGhostDieSfx{
   .instrument = &kGhostDieInstrument,
   .steps = kGhostDieSteps,
-  .stepCount = static_cast<uint8_t>(sizeof(kGhostDieSteps) / sizeof(kGhostDieSteps[0])),
+  .stepCount = count8(kGhostDieSteps),
 };
 
 constexpr Instrument kMusicInstrument{
@@ -274,7 +287,7 @@ constexpr PatternStep kLeadPatternASteps[] = {
 
 constexpr Pattern kLeadPatternA{
   .steps = kLeadPatternASteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kLeadPatternASteps) / sizeof(kLeadPatternASteps[0])),
+  .stepCount = count16(kLeadPatternASteps),
   .unitMs = kBaseStepMs,
   .loop = false,
 };
@@ -292,7 +305,7 @@ constexpr PatternStep kLeadPatternBSteps[] = {
 
 constexpr Pattern kLeadPatternB{
   .steps = kLeadPatternBSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kLeadPatternBSteps) / sizeof(kLeadPatternBSteps[0])),
+  .stepCount = count16(kLeadPatternBSteps),
   .unitMs = kBaseStepMs,
   .loop = false,
 };
@@ -318,7 +331,7 @@ constexpr PatternStep kBassPatternSteps[] = {
 
 constexpr Pattern kBassPattern{
   .steps = kBassPatternSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternSteps) / sizeof(kBassPatternSteps[0])),
+  .stepCount = count16(kBassPatternSteps),
   .unitMs = kBaseStepMs,
   .loop = false,
 };
@@ -330,7 +343,7 @@ constexpr PatternStep kBassPatternEndSteps[] = {
 
 constexpr Pattern kBassPatternEnd{
   .steps = kBassPatternEndSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kBassPatternEndSteps) / sizeof(kBassPatternEndSteps[0])),
+  .stepCount = count16(kBassPatternEndSteps),
   .unitMs = kBaseStepMs,
   .loop = false,
 };
@@ -348,7 +361,7 @@ constexpr PatternStep kHatPatternSteps[] = {
 
 constexpr Pattern kHatPattern{
   .steps = kHatPatternSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kHatPatternSteps) / sizeof(kHatPatternSteps[0])),
+  .stepCount = count16(kHatPatternSteps),
   .unitMs = kBaseStepMs,
   .loop = false,
 };
@@ -360,7 +373,7 @@ constexpr PatternStep kSnarePatternSteps[] = {
 
 constexpr Pattern kSnarePattern{
   .steps = kSnarePatternSteps,
-  .stepCount = static_cast<uint16_t>(sizeof(kSnarePatternSteps) / sizeof(kSnarePatternSteps[0])),
+  .stepCount = count16(kSnarePatternSteps),
   .unitMs = kBaseStepMs,
   .loop = false,
 };
@@ -444,25 +457,25 @@ WolfAudio::WolfAudio()
     .player = &synthEngine,
     .program = makeProgramRef(bassInstrument),
     .clips = kBassClips,
-    .clipCount = static_cast<uint16_t>(sizeof(kBassClips) / sizeof(kBassClips[0])),
+    .clipCount = count16(kBassClips),
   };
   songLanes[2] = {
     .voiceIndex = kHatVoice,
     .player = &synthEngine,
     .program = makeProgramRef(hatInstrument),
     .clips = kHatClips,
-    .clipCount = static_cast<uint16_t>(sizeof(kHatClips) / sizeof(kHatClips[0])),
+    .clipCount = count16(kHatClips),
   };
   songLanes[3] = {
     .voiceIndex = kSnareVoice,
     .player = &samplePlayer,
     .program = makeProgramRef(snareSampleInstrument),
     .clips = kSnareClips,
-    .clipCount = static_cast<uint16_t>(sizeof(kSnareClips) / sizeof(kSnareClips[0])),
+    .clipCount = count16(kSnareClips),
   };
   song = {
     .lanes = songLanes,
-    .laneCount = static_cast<uint8_t>(sizeof(songLanes) / sizeof(songLanes[0])),
+    .laneCount = count8(songLanes),
   };
   configureSampleOverrides();
   songPlayer.bind(song);
@@ -550,7 +563,7 @@ void WolfAudio::playSynthSfx(const Sfx& sfx, float baseHz, uint8_t velocity) {
   return;
 #else
   synthEngine.triggerSfx(nextSynthSfxVoice, sfx, baseHz, velocity);
-  nextSynthSfxVoice = static_cast<uint8_t>((nextSynthSfxVoice + 1u) % kSfxVoiceCount);
+  nextSynthSfxVoice = (nextSynthSfxVoice + 1u) % kSfxVoiceCount;
 #endif
 }
 
@@ -583,6 +596,28 @@ void WolfAudio::playDoorOpen() {
     samplePlayer.playOneShot(doorSampleInstrument, 255u);
   } else {
     playSynthSfx(doorSfx, 196.0f, 255u);
+  }
+}
+
+void WolfAudio::playEnemyAudio(const char* audioId) {
+  if (audioId == nullptr) {
+    return;
+  }
+  if (strcmp(audioId, "zombie_fire") == 0) {
+    playZombieFire();
+    return;
+  }
+  if (strcmp(audioId, "zombie_die") == 0) {
+    playZombieDie();
+    return;
+  }
+  if (strcmp(audioId, "ghost_attack") == 0) {
+    playGhostAttack();
+    return;
+  }
+  if (strcmp(audioId, "ghost_die") == 0) {
+    playGhostDie();
+    return;
   }
 }
 

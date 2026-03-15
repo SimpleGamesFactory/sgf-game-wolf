@@ -14,6 +14,15 @@
 
 namespace {
 
+template <typename T>
+T* allocBuffer(size_t count) {
+#if defined(ARDUINO_ARCH_ESP32)
+  return static_cast<T*>(heap_caps_malloc(sizeof(T) * count, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+#else
+  return static_cast<T*>(malloc(sizeof(T) * count));
+#endif
+}
+
 class HudBufferFillRect : public IFillRect {
 public:
   HudBufferFillRect(uint8_t* pixelsRef, int widthRef, int heightRef)
@@ -40,10 +49,10 @@ public:
 
 private:
   static uint8_t packRgb332(uint16_t color565) {
-    uint8_t r = static_cast<uint8_t>(((color565 >> 11) & 0x1Fu) * 255u / 31u);
-    uint8_t g = static_cast<uint8_t>(((color565 >> 5) & 0x3Fu) * 255u / 63u);
-    uint8_t b = static_cast<uint8_t>((color565 & 0x1Fu) * 255u / 31u);
-    return static_cast<uint8_t>((r & 0xE0u) | ((g >> 3) & 0x1Cu) | (b >> 6));
+    uint8_t r = ((color565 >> 11) & 0x1Fu) * 255u / 31u;
+    uint8_t g = ((color565 >> 5) & 0x3Fu) * 255u / 63u;
+    uint8_t b = (color565 & 0x1Fu) * 255u / 31u;
+    return (r & 0xE0u) | ((g >> 3) & 0x1Cu) | (b >> 6);
   }
 
   uint8_t* pixels = nullptr;
@@ -55,10 +64,10 @@ uint16_t unpackRgb332(uint8_t packed) {
   uint8_t r = packed & 0xE0u;
   uint8_t g = (packed & 0x1Cu) << 3;
   uint8_t b = (packed & 0x03u) << 6;
-  r |= static_cast<uint8_t>(r >> 3);
-  g |= static_cast<uint8_t>(g >> 3);
-  b |= static_cast<uint8_t>(b >> 2);
-  b |= static_cast<uint8_t>(b >> 4);
+  r |= r >> 3;
+  g |= g >> 3;
+  b |= b >> 2;
+  b |= b >> 4;
   return Color565::rgb(r, g, b);
 }
 
@@ -69,13 +78,7 @@ void Hud::begin(int width, int worldHeight) {
   worldScreenH = worldHeight;
 #if WOLF_HEAP_COLD_BUFFERS
   if (buffer == nullptr) {
-    const size_t bufferBytes = static_cast<size_t>(screenW) * HUD_H;
-#if defined(ARDUINO_ARCH_ESP32)
-    buffer = static_cast<uint8_t*>(
-      heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
-#else
-    buffer = static_cast<uint8_t*>(malloc(bufferBytes));
-#endif
+    buffer = allocBuffer<uint8_t>(screenW * HUD_H);
     if (buffer == nullptr) {
       abort();
     }

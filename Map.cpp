@@ -1,6 +1,6 @@
 #include "Map.h"
 
-#include "Zombie.h"
+#include "EnemyCatalog.h"
 
 void Map::load(
   uint8_t (*tiles)[MAX_WIDTH],
@@ -53,8 +53,6 @@ void Map::load(
 uint8_t Map::decodeTile(char symbol) {
   switch (symbol) {
     case '.': return 0;
-    case Zombie::MAP_SYMBOL: return 0;
-    case Zombie::GHOST_SYMBOL: return 0;
     case '#': return 1;
     case 'A': return 2;
     case 'B': return 3;
@@ -78,28 +76,31 @@ uint8_t Map::decodeTile(char symbol) {
 }
 
 bool Map::decodeSpawn(char symbol, Spawn& spawn, int x, int y) {
+  if (EnemyCatalog::isMapSymbol(symbol)) {
+    return true;
+  }
   switch (symbol) {
     case '>':
-      spawn.x = static_cast<float>(x) + 0.5f;
-      spawn.y = static_cast<float>(y) + 0.5f;
+      spawn.x = x + 0.5f;
+      spawn.y = y + 0.5f;
       spawn.dirX = 1.0f;
       spawn.dirY = 0.0f;
       return true;
     case '<':
-      spawn.x = static_cast<float>(x) + 0.5f;
-      spawn.y = static_cast<float>(y) + 0.5f;
+      spawn.x = x + 0.5f;
+      spawn.y = y + 0.5f;
       spawn.dirX = -1.0f;
       spawn.dirY = 0.0f;
       return true;
     case '^':
-      spawn.x = static_cast<float>(x) + 0.5f;
-      spawn.y = static_cast<float>(y) + 0.5f;
+      spawn.x = x + 0.5f;
+      spawn.y = y + 0.5f;
       spawn.dirX = 0.0f;
       spawn.dirY = -1.0f;
       return true;
     case 'v':
-      spawn.x = static_cast<float>(x) + 0.5f;
-      spawn.y = static_cast<float>(y) + 0.5f;
+      spawn.x = x + 0.5f;
+      spawn.y = y + 0.5f;
       spawn.dirX = 0.0f;
       spawn.dirY = 1.0f;
       return true;
